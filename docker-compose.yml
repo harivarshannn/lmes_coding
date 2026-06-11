@@ -1,0 +1,92 @@
+version: "3.8"
+
+services:
+  # --- Single Postgres Database Server ---
+  # Hosts both 'coding_platform' (FastAPI app) and 'judge0' databases
+  db:
+    image: postgres:16.2
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=coding_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db_init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  # --- Redis Message Broker ---
+  redis:
+    image: redis:7.2.4
+    command: [
+      "bash", "-c",
+      'docker-entrypoint.sh --appendonly no --requirepass "$$REDIS_PASSWORD"'
+    ]
+    env_file: ./judge0/judge0.conf
+    ports:
+      - "6379:6379"
+    restart: always
+
+  # --- Judge0 Server API ---
+  server:
+    build:
+      context: ./judge0
+      dockerfile: Dockerfile
+    volumes:
+      - ./judge0/judge0.conf:/judge0.conf:ro
+      - ./judge0/app/jobs/isolate_job.rb:/api/app/jobs/isolate_job.rb:ro
+      - ./judge0/db:/api/db:ro
+    ports:
+      - "2358:2358"
+    privileged: true
+    env_file: ./judge0/judge0.conf
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: always
+
+  # --- Judge0 Sandboxed Execution Worker ---
+  worker:
+    build:
+      context: ./judge0
+      dockerfile: Dockerfile
+    command: ["bash", "-c", "mkdir -p /sys/fs/cgroup/init && for pid in $$(cat /sys/fs/cgroup/cgroup.procs); do echo $$pid > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null; done; echo '+cpu +memory +pids +cpuset' > /sys/fs/cgroup/cgroup.subtree_control; exec ./scripts/workers"]
+    volumes:
+      - ./judge0/judge0.conf:/judge0.conf:ro
+      - ./judge0/app/jobs/isolate_job.rb:/api/app/jobs/isolate_job.rb:ro
+      - ./judge0/db:/api/db:ro
+    privileged: true
+    user: root
+    env_file: ./judge0/judge0.conf
+    depends_on:
+      server:
+        condition: service_started
+    restart: always
+
+  # --- FastAPI Python Application (Backend API) ---
+  backend-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/coding_platform
+      - JUDGE0_URL=http://server:2358
+    depends_on:
+      db:
+        condition: service_healthy
+      server:
+        condition: service_started
+    restart: always
+
+volumes:
+  postgres_data:

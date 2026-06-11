@@ -1,0 +1,45 @@
+# judge0/Dockerfile.compilers
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install core build dependencies, Ruby, Python, Java, Node.js, and SQLite
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      build-essential \
+      ca-certificates \
+      curl \
+      git \
+      libcap-dev \
+      libpq-dev \
+      shared-mime-info \
+      sudo \
+      unzip \
+      # Ruby runtime (required by Judge0 rails backend)
+      ruby-full \
+      # Python 3 interpreter (for Python runs and HTML/React grading)
+      python3 \
+      python3-pip \
+      python3-dev \
+      # Java 11 runtime & compiler (for Java runs)
+      openjdk-11-jdk-headless \
+      # Node.js and npm (for JS and TS runs)
+      nodejs \
+      npm \
+      # SQLite3 (for SQL runs)
+      sqlite3 \
+      libsqlite3-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install TypeScript globally for compilation support
+RUN npm install -g typescript
+
+# Compile and install isolate v2.0 (compatible with cgroups v2)
+WORKDIR /tmp
+RUN git clone https://github.com/ioi/isolate.git && \
+    cd isolate && \
+    make install && \
+    rm -rf /tmp/isolate
+
+# Setup isolate config
+RUN echo "cg_root = /sys/fs/cgroup\nlock_root = /run/isolate/locks" > /usr/local/etc/isolate

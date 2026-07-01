@@ -12,15 +12,22 @@ def test_judge0_integration():
         "language_id": 71
     }
     
-    # Java
-    java_payload = {
-        "source_code": 'public class Main {\npublic static void main(String[] args) {\nSystem.out.println("Hello");\n}\n}',
-        "language_id": 62
+    # JavaScript
+    js_payload = {
+        "source_code": 'console.log("Hello")',
+        "language_id": 63
+    }
+    
+    # SQL (SQLite)
+    sql_payload = {
+        "source_code": 'CREATE TABLE test(val TEXT); INSERT INTO test VALUES("Hello"); SELECT * FROM test;',
+        "language_id": 82
     }
     
     languages = [
         ("Python", py_payload, "Hello\n"),
-        ("Java", java_payload, "Hello\n")
+        ("JavaScript", js_payload, "Hello\n"),
+        ("SQL (SQLite)", sql_payload, "Hello\n")
     ]
     
     for name, payload, expected in languages:

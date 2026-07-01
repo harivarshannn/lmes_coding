@@ -1,8 +1,8 @@
-from datetime import datetime
 from pydantic import BaseModel, ConfigDict
+from datetime import datetime
 
 class TestCaseBase(BaseModel):
-    input_data: str
+    input: str # Renamed from input_data to input
     expected_output: str
     is_hidden: bool = False
 

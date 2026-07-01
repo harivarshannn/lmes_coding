@@ -1,0 +1,6 @@
+# Force LF line endings for all shell scripts and container entrypoint scripts
+*.sh text eol=lf
+judge0/docker-entrypoint.sh text eol=lf
+judge0/scripts/* text eol=lf
+backend/Dockerfile text eol=lf
+judge0/Dockerfile text eol=lf

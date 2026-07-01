@@ -1,3 +1,5 @@
+version: "3.8"
+
 x-logging:
   &default-logging
   logging:
@@ -6,8 +8,11 @@ x-logging:
       max-size: 100M
 
 services:
+  # Customized Sandboxed API Server
   server:
-    image: judge0/judge0:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
       - ./judge0.conf:/judge0.conf:ro
       - ./app/jobs/isolate_job.rb:/api/app/jobs/isolate_job.rb:ro
@@ -17,9 +22,17 @@ services:
     privileged: true
     <<: *default-logging
     restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
+  # Customized Sandboxed Worker
   worker:
-    image: judge0/judge0:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: ["bash", "-c", "mkdir -p /sys/fs/cgroup/init && for pid in $$(cat /sys/fs/cgroup/cgroup.procs); do echo $$pid > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null; done; echo '+cpu +memory +pids +cpuset' > /sys/fs/cgroup/cgroup.subtree_control; exec ./scripts/workers"]
     volumes:
       - ./judge0.conf:/judge0.conf:ro
@@ -29,22 +42,36 @@ services:
     user: root
     <<: *default-logging
     restart: always
+    depends_on:
+      - server
 
+  # Shared lightweight database
   db:
-    image: postgres:16.2
+    image: postgres:16-alpine
     env_file: judge0.conf
     volumes:
       - data:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     <<: *default-logging
     restart: always
 
+  # Shared lightweight broker
   redis:
-    image: redis:7.2.4
+    image: redis:7-alpine
     command: [
-      "bash", "-c",
+      "sh", "-c",
       'docker-entrypoint.sh --appendonly no --requirepass "$$REDIS_PASSWORD"'
     ]
     env_file: judge0.conf
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     <<: *default-logging
     restart: always
 

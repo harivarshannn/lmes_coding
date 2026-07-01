@@ -21,7 +21,7 @@ def test_evaluator_compilation_error(monkeypatch):
     
     monkeypatch.setattr("app.services.evaluator.get_judge0_service", lambda: MockService())
     
-    tc = TestCase(input_data="1 2", expected_output="3")
+    tc = TestCase(input="1 2", expected_output="3") # Renamed to input
     verdict, passed, total = Evaluator.evaluate("invalid code", "python", [tc])
     assert verdict == "Compilation Error"
     assert passed == 0
@@ -41,7 +41,7 @@ def test_evaluator_time_limit_exceeded(monkeypatch):
     
     monkeypatch.setattr("app.services.evaluator.get_judge0_service", lambda: MockService())
     
-    tc = TestCase(input_data="1 2", expected_output="3")
+    tc = TestCase(input="1 2", expected_output="3") # Renamed to input
     verdict, passed, total = Evaluator.evaluate("while True: pass", "python", [tc])
     assert verdict == "Time Limit Exceeded"
     assert passed == 0

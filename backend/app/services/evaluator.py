@@ -24,15 +24,13 @@ class Evaluator:
         final_verdict = "Accepted"
         
         for tc in testcases:
-            exec_code = code
-            stdin_data = tc.input_data
             if language == "sql":
-                exec_code = tc.input_data + "\n" + code
+                exec_code = (tc.input or "") + "\n" + code
                 stdin_data = ""
-            elif language in ["html", "react"]:
-                exec_code = tc.input_data
-                stdin_data = code
-                
+            else:
+                exec_code = code
+                stdin_data = tc.input
+            
             result = judge0.execute_code(exec_code, language_id, stdin_data)
             status_id = result["status"]["id"]
             

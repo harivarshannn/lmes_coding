@@ -1,41 +1,104 @@
-FROM judge0-compilers:lightweight AS production
+# ========================================================
+# STAGE 1: Sandbox Builder (Compile Isolate)
+# ========================================================
+FROM ruby:3.0-slim AS isolate-builder
 
-ENV JUDGE0_HOMEPAGE "https://judge0.com"
-LABEL homepage=$JUDGE0_HOMEPAGE
-
-ENV JUDGE0_SOURCE_CODE "https://github.com/judge0/judge0"
-LABEL source_code=$JUDGE0_SOURCE_CODE
-
-ENV JUDGE0_MAINTAINER "Herman Zvonimir Došilović <hermanz.dosilovic@gmail.com>"
-LABEL maintainer=$JUDGE0_MAINTAINER
-
-ENV PATH "/usr/bin:/opt/.gem/bin:$PATH"
-ENV GEM_HOME "/opt/.gem/"
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      cron \
+      build-essential \
+      ca-certificates \
+      git \
+      libcap-dev \
+      libseccomp-dev \
+      libsystemd-dev \
+      pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp
+RUN git clone https://github.com/ioi/isolate.git && \
+    cd isolate && \
+    git checkout v2.0 && \
+    make install
+
+# ========================================================
+# STAGE 2: Rails Gem Builder (Compile Gem Native Extensions)
+# ========================================================
+FROM ruby:3.0-slim AS gems-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      build-essential \
       libpq-dev \
-      sudo && \
-    rm -rf /var/lib/apt/lists/* && \
-    echo "gem: --no-document" > /root/.gemrc && \
-    gem install bundler:2.1.4
+      shared-mime-info && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV GEM_HOME "/opt/.gem/"
+RUN gem install bundler:2.1.4
+
+WORKDIR /api
+COPY Gemfile Gemfile.lock ./
+RUN RAILS_ENV=production bundle
+
+# ========================================================
+# STAGE 3: Production Runtime Sandbox Environment
+# ========================================================
+FROM ruby:3.0-slim AS production
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH "/usr/bin:/opt/.gem/bin:$PATH"
+ENV GEM_HOME "/opt/.gem/"
+
+# Install ONLY runtime packages for Python 3, Node.js, SQLite3, and Ruby
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      cron \
+      curl \
+      libcap2 \
+      libseccomp2 \
+      libpq5 \
+      shared-mime-info \
+      sudo \
+      # Python 3 runtime (no dev tools/compilers)
+      python3 \
+      python3-pip \
+      # Node.js runtime (no npm/build tools)
+      nodejs \
+      npm \
+      # SQLite3 execution
+      sqlite3 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy Compiled Isolate binary & config from Stage 1
+COPY --from=isolate-builder /usr/local/bin/isolate /usr/local/bin/isolate
+COPY --from=isolate-builder /usr/local/etc/isolate /usr/local/etc/isolate
+
+# Setup isolate config cgroups paths
+RUN echo "cg_root = /sys/fs/cgroup\nlock_root = /run/isolate/locks" > /usr/local/etc/isolate
+
+# Copy Pre-compiled Gems from Stage 2
+COPY --from=gems-builder /opt/.gem/ /opt/.gem/
 
 EXPOSE 2358
 
 WORKDIR /api
 
-COPY Gemfile* ./
-RUN RAILS_ENV=production bundle
-
+# Copy cron configurations
 COPY cron /etc/cron.d
 RUN cat /etc/cron.d/* | crontab -
 
+# Copy application source code
 COPY . .
 
+# Setup entrypoint and start command
 ENTRYPOINT ["/api/docker-entrypoint.sh"]
 CMD ["/api/scripts/server"]
 
+# Setup non-privileged sandbox execution user
 RUN useradd -u 1000 -m -r judge0 && \
     echo "judge0 ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers && \
     chown judge0: /api/tmp/
@@ -45,7 +108,6 @@ USER judge0
 ENV JUDGE0_VERSION "1.13.1"
 LABEL version=$JUDGE0_VERSION
 
-
+# Development Target
 FROM production AS development
-
 CMD ["sleep", "infinity"]

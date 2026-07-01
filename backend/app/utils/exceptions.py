@@ -9,7 +9,7 @@ class InvalidLanguageException(CodingPlatformException):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
             code="INVALID_LANGUAGE",
-            message=f"Language '{language}' is not supported. Supported: python, cpp, java"
+            message=f"Language '{language}' is not supported. Supported: python, javascript, sql"
         )
 
 class QuestionNotFoundException(CodingPlatformException):

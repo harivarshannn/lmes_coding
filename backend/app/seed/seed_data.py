@@ -1,23 +1,148 @@
+from datetime import datetime, date
 from app.database.session import SessionLocal, Base, engine
+from app.models.topic import Topic
 from app.models.question import Question
+from app.models.language import Language
+from app.models.question_language import QuestionLanguage
 from app.models.testcase import TestCase
-from app.models.submission import Submission
+from app.models.hint import Hint
+from app.models.solution import Solution
+from app.models.tag import Tag
+from app.models.question_tag import QuestionTag
+from app.models.badge import Badge
+from app.models.daily_streak import DailyStreak
+from app.models.leaderboard import Leaderboard
+from app.models.concept import Concept
+from app.models.progress import Progress
 
 def seed():
-    print("Dropping all existing tables to apply updated schema...")
+    print("Dropping all existing database tables to apply new schema...")
     Base.metadata.drop_all(bind=engine)
     
-    print("Creating all tables...")
+    print("Creating all tables in Postgres...")
     Base.metadata.create_all(bind=engine)
     
     db = SessionLocal()
     try:
-        # Two Sum Templates
-        two_sum_python = """def twoSum(nums, target):
+        # 1. Seed Languages
+        print("Seeding Languages...")
+        lang_text = Language(name="Plain Text", judge0_language_id=43)
+        lang_js = Language(name="JavaScript", judge0_language_id=63)
+        lang_py = Language(name="Python", judge0_language_id=71)
+        lang_sql = Language(name="SQL", judge0_language_id=82)
+        db.add_all([lang_text, lang_js, lang_py, lang_sql])
+        db.commit()
+
+        # 2. Seed Topics
+        print("Seeding Topics...")
+        topic_ds = Topic(name="Data Structures", description="Arrays, Lists, Sets, and Maps")
+        topic_algo = Topic(name="Algorithms", description="Sorting, Searching, and Recursion")
+        topic_web = Topic(name="Web Development", description="HTML5, CSS3, and JavaScript preview styling")
+        topic_db = Topic(name="Databases", description="SQL queries, joins, filters, and aggregates")
+        db.add_all([topic_ds, topic_algo, topic_web, topic_db])
+        db.commit()
+
+        # 3. Seed Badges
+        print("Seeding Badges...")
+        badge1 = Badge(name="First Solve", description="Successfully solved your first coding challenge!", icon_url="first_solve.png")
+        badge2 = Badge(name="Streaker", description="Maintained a 3-day daily streak.", icon_url="streak.png")
+        badge3 = Badge(name="Speed Coder", description="Solved a medium problem in under 5 minutes.", icon_url="speed.png")
+        db.add_all([badge1, badge2, badge3])
+        db.commit()
+
+        # 4. Seed Questions
+        print("Seeding Questions and boilerplates...")
+        
+        # Q1: Two Sum (Python)
+        q1 = Question(
+            title="Two Sum",
+            slug="two-sum",
+            description="Find two numbers in an array whose sum equals a target. Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nInput format: The first line contains space-separated integers. The second line contains the target integer.",
+            difficulty="Easy",
+            estimated_time=15,
+            marks=10,
+            topic_id=topic_ds.id,
+            question_type="coding",
+            memory_limit=128000,
+            time_limit=2.0,
+            status="published"
+        )
+        db.add(q1)
+        db.commit()
+
+        # Q2: Palindrome Number (Python)
+        q2 = Question(
+            title="Palindrome Number",
+            slug="palindrome-number",
+            description="Given an integer x, return true if x is a palindrome, and false otherwise. Try doing this without string conversion.",
+            difficulty="Easy",
+            estimated_time=10,
+            marks=10,
+            topic_id=topic_algo.id,
+            question_type="coding",
+            memory_limit=128000,
+            time_limit=2.0,
+            status="published"
+        )
+        db.add(q2)
+        db.commit()
+
+        # Q3: Array Sum (JavaScript)
+        q3 = Question(
+            title="Array Sum",
+            slug="array-sum",
+            description="Given an array of integers, return their sum.\n\nInput format: Space-separated integers on a single line.",
+            difficulty="Easy",
+            estimated_time=5,
+            marks=5,
+            topic_id=topic_ds.id,
+            question_type="coding",
+            memory_limit=128000,
+            time_limit=2.0,
+            status="published"
+        )
+        db.add(q3)
+        db.commit()
+
+        # Q4: Create Blue Button (HTML5 web design)
+        q4 = Question(
+            title="Create Blue Button",
+            slug="create-blue-button",
+            description="Create an HTML button with id 'submit-btn', containing the text 'Submit Form', styled with a blue background and white text. Use Tailwind CSS classes: bg-blue-600, text-white, px-4, py-2, rounded.",
+            difficulty="Easy",
+            estimated_time=10,
+            marks=15,
+            topic_id=topic_web.id,
+            question_type="web",
+            memory_limit=128000,
+            time_limit=2.0,
+            status="published"
+        )
+        db.add(q4)
+        db.commit()
+
+        # Q5: SQL High Earners (SQL SQLite)
+        q5 = Question(
+            title="SQL High Earners",
+            slug="sql-high-earners",
+            description="Write a query to retrieve the name and salary of all employees who earn more than 50000. Sort the results by salary in descending order.\n\nThe database has an employees table with the schema:\n- id (INT)\n- name (TEXT)\n- salary (INT)",
+            difficulty="Easy",
+            estimated_time=10,
+            marks=10,
+            topic_id=topic_db.id,
+            question_type="coding",
+            memory_limit=128000,
+            time_limit=2.0,
+            status="published"
+        )
+        db.add(q5)
+        db.commit()
+
+        # 5. Question Languages (Starter templates)
+        q1_starter_py = """def twoSum(nums, target):
     # Write your Python 3 code here to return a list of two indices
     pass
 
-# Read inputs from stdin
 if __name__ == "__main__":
     import sys
     input_data = sys.stdin.read().splitlines()
@@ -28,45 +153,12 @@ if __name__ == "__main__":
         if res:
             print(" ".join(map(str, res)))
 """
+        db.add(QuestionLanguage(question_id=q1.id, language_id=lang_py.id, starter_code=q1_starter_py))
 
-        two_sum_java = """import java.util.*;
-import java.io.*;
-
-public class Main {
-    // Complete the twoSum function below
-    public static int[] twoSum(int[] nums, int target) {
-        // Write your Java code here
-        
-    }
-
-    public static void main(String[] args) throws Exception {
-        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-        String line1 = br.readLine();
-        if (line1 != null) {
-            String[] parts = line1.trim().split("\\\\s+");
-            int[] nums = new int[parts.length];
-            for (int i = 0; i < parts.length; i++) {
-                nums[i] = Integer.parseInt(parts[i]);
-            }
-            String line2 = br.readLine();
-            if (line2 != null) {
-                int target = Integer.parseInt(line2.trim());
-                int[] res = twoSum(nums, target);
-                if (res.length == 2) {
-                    System.out.println(res[0] + " " + res[1]);
-                }
-            }
-        }
-    }
-}
-"""
-
-        # Palindrome Number Templates
-        palindrome_python = """def isPalindrome(x: int) -> bool:
+        q2_starter_py = """def isPalindrome(x: int) -> bool:
     # Write your Python 3 code here to return True or False
     pass
 
-# Read inputs from stdin
 if __name__ == "__main__":
     import sys
     input_data = sys.stdin.read().splitlines()
@@ -75,36 +167,13 @@ if __name__ == "__main__":
         res = isPalindrome(x)
         print("true" if res else "false")
 """
+        db.add(QuestionLanguage(question_id=q2.id, language_id=lang_py.id, starter_code=q2_starter_py))
 
-        palindrome_java = """import java.util.*;
-import java.io.*;
-
-public class Main {
-    // Complete the isPalindrome function below
-    public static boolean isPalindrome(int x) {
-        // Write your Java code here
-        
-    }
-
-    public static void main(String[] args) throws Exception {
-        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-        String line = br.readLine();
-        if (line != null) {
-            int x = Integer.parseInt(line.trim());
-            boolean res = isPalindrome(x);
-            System.out.println(res ? "true" : "false");
-        }
-    }
-}
-"""
-
-        # Array Sum Templates (JS & TS)
-        array_sum_js = """function arraySum(arr) {
+        q3_starter_js = """function arraySum(arr) {
     // Write your code here to return the sum of the array
     
 }
 
-// Read inputs from stdin
 const readline = require('readline');
 const rl = readline.createInterface({
     input: process.stdin,
@@ -117,290 +186,135 @@ rl.on('line', (line) => {
     console.log(arraySum(arr));
 });
 """
+        db.add(QuestionLanguage(question_id=q3.id, language_id=lang_js.id, starter_code=q3_starter_js))
 
-        array_sum_ts = """function arraySum(arr: number[]): number {
-    // Write your code here to return the sum of the array
-    
-}
-
-// Read inputs from stdin
-import * as readline from 'readline';
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: false
-});
-
-rl.on('line', (line) => {
-    const arr = line.trim().split(/\\s+/).map(Number);
-    console.log(arraySum(arr));
-});
-"""
-
-        # Rank Employees Templates (SQL)
-        rank_employees_sql = """-- Write your SQL query here.
--- The 'employees' table is already defined for you.
--- SELECT name, salary FROM employees ...
-"""
-
-        # Create Blue Button Templates (HTML)
-        blue_button_html = """<!-- Write your HTML5 and Tailwind CSS code here -->
+        q4_starter_html = """<!-- Write your HTML5 markup here -->
 <button id="" class="">
   
 </button>
 """
+        db.add(QuestionLanguage(question_id=q4.id, language_id=lang_text.id, starter_code=q4_starter_html))
 
-        # Simple React Clicker Templates (React)
-        react_clicker_react = """// Write your React component here. It must be named 'App'.
-// Tailwind CSS is fully enabled.
-
-function App() {
-    // 1. Define counter state here
-    
-    return (
-        <div className="p-8 max-w-sm mx-auto bg-white rounded-xl shadow-md space-y-4">
-            <div id="counter" className="text-2xl font-bold text-center">
-                {/* 2. Display count here */}
-                0
-            </div>
-            <button 
-                id="increment" 
-                // 3. Set click handler to increment
-                onClick={() => {}}
-                className="w-full py-2 bg-indigo-600 text-white rounded-md"
-            >
-                Increment
-            </button>
-        </div>
-    );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        q5_starter_sql = """-- Write your SQL query here to retrieve name and salary
+-- employees table: id (INT), name (TEXT), salary (INT)
 """
-
-        print("Seeding 'Two Sum' question...")
-        q1 = Question(
-            title="Two Sum",
-            difficulty="Easy",
-            statement="Find two numbers whose sum equals target. Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. You may assume that each input would have exactly one solution, and you may not use the same element twice.",
-            template_python=two_sum_python,
-            template_java=two_sum_java
-        )
-        db.add(q1)
-        db.commit()
-        db.refresh(q1)
-
-        print("Seeding testcases for 'Two Sum'...")
-        visible_tc1 = TestCase(
-            question_id=q1.id,
-            input_data="2 7 11 15\n9",
-            expected_output="0 1",
-            is_hidden=False
-        )
-        hidden_tc1_1 = TestCase(
-            question_id=q1.id,
-            input_data="3 2 4\n6",
-            expected_output="1 2",
-            is_hidden=True
-        )
-        hidden_tc1_2 = TestCase(
-            question_id=q1.id,
-            input_data="3 3\n6",
-            expected_output="0 1",
-            is_hidden=True
-        )
-        hidden_tc1_3 = TestCase(
-            question_id=q1.id,
-            input_data="-1 -8 9 10\n1",
-            expected_output="0 1",
-            is_hidden=True
-        )
-        db.add_all([visible_tc1, hidden_tc1_1, hidden_tc1_2, hidden_tc1_3])
+        db.add(QuestionLanguage(question_id=q5.id, language_id=lang_sql.id, starter_code=q5_starter_sql))
         db.commit()
 
-        print("Seeding 'Palindrome Number' question...")
-        q2 = Question(
-            title="Palindrome Number",
-            difficulty="Easy",
-            statement="Given an integer x, return true if x is a palindrome, and false otherwise. Do not use string conversion if solving in languages where memory constraints apply.",
-            template_python=palindrome_python,
-            template_java=palindrome_java
-        )
-        db.add(q2)
-        db.commit()
-        db.refresh(q2)
-
-        print("Seeding testcases for 'Palindrome Number'...")
-        visible_tc2 = TestCase(
-            question_id=q2.id,
-            input_data="121",
-            expected_output="true",
-            is_hidden=False
-        )
-        hidden_tc2_1 = TestCase(
-            question_id=q2.id,
-            input_data="-121",
-            expected_output="false",
-            is_hidden=True
-        )
-        hidden_tc2_2 = TestCase(
-            question_id=q2.id,
-            input_data="10",
-            expected_output="false",
-            is_hidden=True
-        )
-        hidden_tc2_3 = TestCase(
-            question_id=q2.id,
-            input_data="12321",
-            expected_output="true",
-            is_hidden=True
-        )
-        db.add_all([visible_tc2, hidden_tc2_1, hidden_tc2_2, hidden_tc2_3])
-        db.commit()
-
-        print("Seeding 'Array Sum' question...")
-        q3 = Question(
-            title="Array Sum",
-            difficulty="Easy",
-            statement="Given an array of integers, return their sum.",
-            template_javascript=array_sum_js,
-            template_typescript=array_sum_ts
-        )
-        db.add(q3)
-        db.commit()
-        db.refresh(q3)
-
-        print("Seeding testcases for 'Array Sum'...")
-        visible_tc3 = TestCase(
-            question_id=q3.id,
-            input_data="1 2 3 4",
-            expected_output="10",
-            is_hidden=False
-        )
-        hidden_tc3_1 = TestCase(
-            question_id=q3.id,
-            input_data="-1 -2 3",
-            expected_output="0",
-            is_hidden=True
-        )
-        hidden_tc3_2 = TestCase(
-            question_id=q3.id,
-            input_data="100 200 300 400",
-            expected_output="1000",
-            is_hidden=True
-        )
-        db.add_all([visible_tc3, hidden_tc3_1, hidden_tc3_2])
-        db.commit()
-
-        print("Seeding 'Rank Employees' question...")
-        q4 = Question(
-            title="Rank Employees",
-            difficulty="Medium",
-            statement="Given an employees table, write a SQL query to select names and salaries of all employees earning more than 50000, ordered by salary descending.",
-            template_sql=rank_employees_sql
-        )
-        db.add(q4)
-        db.commit()
-        db.refresh(q4)
-
-        print("Seeding testcases for 'Rank Employees'...")
-        sql_setup = """CREATE TABLE employees (id INT, name TEXT, salary INT);
-INSERT INTO employees VALUES (1, 'Alice', 60000);
-INSERT INTO employees VALUES (2, 'Bob', 45000);
-INSERT INTO employees VALUES (3, 'Charlie', 80000);"""
-        visible_tc4 = TestCase(
-            question_id=q4.id,
-            input_data=sql_setup,
-            expected_output="Charlie|80000\nAlice|60000",
-            is_hidden=False
-        )
+        # 6. Testcases
+        print("Seeding Test cases...")
         
-        sql_setup_hidden = """CREATE TABLE employees (id INT, name TEXT, salary INT);
-INSERT INTO employees VALUES (1, 'Xavier', 30000);
-INSERT INTO employees VALUES (2, 'Yolanda', 70000);
-INSERT INTO employees VALUES (3, 'Zane', 95000);
-INSERT INTO employees VALUES (4, 'Wade', 50001);"""
-        hidden_tc4_1 = TestCase(
-            question_id=q4.id,
-            input_data=sql_setup_hidden,
-            expected_output="Zane|95000\nYolanda|70000\nWade|50001",
-            is_hidden=True
+        # Two Sum Testcases (input column)
+        db.add(TestCase(question_id=q1.id, input="2 7 11 15\n9", expected_output="0 1", is_hidden=False))
+        db.add(TestCase(question_id=q1.id, input="3 2 4\n6", expected_output="1 2", is_hidden=True))
+        db.add(TestCase(question_id=q1.id, input="3 3\n6", expected_output="0 1", is_hidden=True))
+        
+        # Palindrome Number Testcases
+        db.add(TestCase(question_id=q2.id, input="121", expected_output="true", is_hidden=False))
+        db.add(TestCase(question_id=q2.id, input="-121", expected_output="false", is_hidden=True))
+        db.add(TestCase(question_id=q2.id, input="10", expected_output="false", is_hidden=True))
+        
+        # Array Sum Testcases
+        db.add(TestCase(question_id=q3.id, input="1 2 3 4", expected_output="10", is_hidden=False))
+        db.add(TestCase(question_id=q3.id, input="-1 -2 3", expected_output="0", is_hidden=True))
+        
+        # HTML Testcase (acts as basic static verify)
+        db.add(TestCase(question_id=q4.id, input="validate", expected_output="validation PASSED", is_hidden=False))
+
+        # SQL Testcases (Testcase input holds setup SQL statements)
+        q5_setup_1 = (
+            "CREATE TABLE employees (id INT, name TEXT, salary INT);\n"
+            "INSERT INTO employees VALUES (1, 'Alice', 60000);\n"
+            "INSERT INTO employees VALUES (2, 'Bob', 45000);\n"
+            "INSERT INTO employees VALUES (3, 'Charlie', 55000);"
         )
-        db.add_all([visible_tc4, hidden_tc4_1])
+        q5_expected_1 = "Alice|60000\nCharlie|55000"
+        
+        q5_setup_2 = (
+            "CREATE TABLE employees (id INT, name TEXT, salary INT);\n"
+            "INSERT INTO employees VALUES (1, 'David', 75000);\n"
+            "INSERT INTO employees VALUES (2, 'Emma', 50000);\n"
+            "INSERT INTO employees VALUES (3, 'Frank', 90000);"
+        )
+        q5_expected_2 = "Frank|90000\nDavid|75000"
+        
+        db.add(TestCase(question_id=q5.id, input=q5_setup_1, expected_output=q5_expected_1, is_hidden=False))
+        db.add(TestCase(question_id=q5.id, input=q5_setup_2, expected_output=q5_expected_2, is_hidden=True))
         db.commit()
 
-        print("Seeding 'Create Blue Button' question...")
-        html_grader = """import sys
-import re
-html = sys.stdin.read()
+        # 7. Seed Hints (Stage Reveal Logic)
+        print("Seeding AI Hints reveal stages...")
+        db.add(Hint(question_id=q1.id, attempt_number=1, hint="Small Hint: Try using a nested loop to check every combination of two numbers."))
+        db.add(Hint(question_id=q1.id, attempt_number=2, hint="Detailed Hint: To do it in one pass, store seen numbers and their indices in a hash map."))
+        db.add(Hint(question_id=q1.id, attempt_number=3, hint="Approach: Loop over the array. If (target - current_number) is in the hash map, return its stored index and the current index."))
+        
+        db.add(Hint(question_id=q2.id, attempt_number=1, hint="Small Hint: Negative numbers can never be palindromes due to the leading minus sign."))
+        db.add(Hint(question_id=q2.id, attempt_number=2, hint="Detailed Hint: You can reverse the integer mathematically using division and modulo operators."))
+        db.add(Hint(question_id=q2.id, attempt_number=3, hint="Approach: Store a copy of x, extract digits from the back, construct the reversed number, and check if it equals the copy."))
+        
+        db.add(Hint(question_id=q5.id, attempt_number=1, hint="Small Hint: Use the WHERE clause to check employee salary ranges."))
+        db.add(Hint(question_id=q5.id, attempt_number=2, hint="Detailed Hint: SELECT 'name' and 'salary' fields and sort them in reverse salary order."))
+        db.add(Hint(question_id=q5.id, attempt_number=3, hint="Approach: Use `WHERE salary > 50000` combined with `ORDER BY salary DESC`."))
+        db.commit()
 
-# Check button exists with id submit-btn
-btn_match = re.search(r'id=["\\']submit-btn["\\']', html)
-# Check classes exist
-bg_match = 'bg-blue-600' in html
-text_match = 'text-white' in html
-content_match = 'Submit Form' in html
-
-if btn_match and bg_match and text_match and content_match:
-    print("validation PASSED")
-else:
-    print("validation FAILED: Make sure you use the correct classes, id, and text.")
+        # 8. Seed Solutions
+        print("Seeding Solutions...")
+        q1_sol = """def twoSum(nums, target):
+    seen = {}
+    for i, num in enumerate(nums):
+        complement = target - num
+        if complement in seen:
+            return [seen[complement], i]
+        seen[num] = i
+    return []
 """
-        q5 = Question(
-            title="Create Blue Button",
-            difficulty="Easy",
-            statement="Create an HTML button with id 'submit-btn', containing the text 'Submit Form', styled with a blue background and white text. Use Tailwind CSS classes: `bg-blue-600`, `text-white`, `px-4`, `py-2`, `rounded`.",
-            template_html=blue_button_html
-        )
-        db.add(q5)
-        db.commit()
-        db.refresh(q5)
+        db.add(Solution(
+            question_id=q1.id, 
+            language_id=lang_py.id, 
+            code=q1_sol, 
+            explanation="We iterate and look up the target complement in a dictionary. This runs in O(N) time and O(N) space.", 
+            complexity="O(N)"
+        ))
+        
+        q2_sol = """def isPalindrome(x: int) -> bool:
+    if x < 0:
+        return False
+    temp = x
+    rev = 0
+    while temp > 0:
+        rev = rev * 10 + (temp % 10)
+        temp = temp // 10
+    return rev == x
+"""
+        db.add(Solution(
+            question_id=q2.id, 
+            language_id=lang_py.id, 
+            code=q2_sol, 
+            explanation="We mathematically reverse the integer using modulo division and compare the final reversed value to x.", 
+            complexity="O(log(N))"
+        ))
 
-        print("Seeding testcases for 'Create Blue Button'...")
-        visible_tc5 = TestCase(
+        q5_sol = "SELECT name, salary FROM employees WHERE salary > 50000 ORDER BY salary DESC;"
+        db.add(Solution(
             question_id=q5.id,
-            input_data=html_grader,
-            expected_output="validation PASSED",
-            is_hidden=False
-        )
-        db.add(visible_tc5)
+            language_id=lang_sql.id,
+            code=q5_sol,
+            explanation="Use WHERE clause to filter salaries exceeding 50000, and ORDER BY to sort descending.",
+            complexity="O(N log N)"
+        ))
         db.commit()
 
-        print("Seeding 'Simple React Clicker' question...")
-        react_grader = """import sys
-code = sys.stdin.read()
-
-# Verify state Hook is used or counter is rendered
-state_match = 'useState' in code
-click_handler_match = 'setCount' in code or 'count + 1' in code
-render_match = 'createRoot' in code
-
-if state_match and click_handler_match and render_match:
-    print("validation PASSED")
-else:
-    print("validation FAILED: Verify you are using useState and calling the setter inside onClick.")
-"""
-        q6 = Question(
-            title="Simple React Clicker",
-            difficulty="Easy",
-            statement="Create a React component named 'App' that maintains a counter initialized to 0. It should display the count inside an element with id 'counter' and have a button with id 'increment' that increments the count when clicked.",
-            template_react=react_clicker_react
-        )
-        db.add(q6)
-        db.commit()
-        db.refresh(q6)
-
-        print("Seeding testcases for 'Simple React Clicker'...")
-        visible_tc6 = TestCase(
-            question_id=q6.id,
-            input_data=react_grader,
-            expected_output="validation PASSED",
-            is_hidden=False
-        )
-        db.add(visible_tc6)
+        # 9. Seed Mock Leaderboard Profiles
+        print("Seeding Leaderboard rankings...")
+        db.add(Leaderboard(user_id=1, username="student", xp=100, rank=1))
+        db.add(Leaderboard(user_id=2, username="codemaster99", xp=90, rank=2))
+        db.add(Leaderboard(user_id=3, username="l33t_hacker", xp=75, rank=3))
+        
+        # Seed daily streak
+        db.add(DailyStreak(user_id=1, current_streak=1, longest_streak=1, last_activity_date=date.today()))
         db.commit()
 
-        print("Database seeded successfully with all language templates!")
+        print("Database seeded with new normalized tables successfully!")
     except Exception as e:
         print(f"Error seeding database: {e}")
         db.rollback()

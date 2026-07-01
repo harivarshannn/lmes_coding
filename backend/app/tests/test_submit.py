@@ -5,13 +5,14 @@ def test_submit_endpoint_accepted(client, monkeypatch):
     # 1. Create a question
     client.post("/questions", json={
         "title": "Two Sum",
+        "slug": "two-sum",
         "difficulty": "Easy",
-        "statement": "Find two numbers"
+        "description": "Find two numbers"
     })
     
     # 2. Create a testcase (the Mock service returns "hello\n" for print('hello'))
     client.post("/questions/1/testcases", json={
-        "input_data": "2 7 11 15\n9",
+        "input": "2 7 11 15\n9",
         "expected_output": "hello\n",
         "is_hidden": False
     })
@@ -32,7 +33,7 @@ def test_submit_endpoint_accepted(client, monkeypatch):
     response = client.get("/submissions")
     assert response.status_code == 200
     assert len(response.json()) == 1
-    assert response.json()[0]["verdict"] == "Accepted"
+    assert response.json()[0]["status"] == "Accepted"
     
     # Check student submissions
     response = client.get("/students/100/submissions")
@@ -42,17 +43,18 @@ def test_submit_endpoint_accepted(client, monkeypatch):
     # Check single submission
     response = client.get("/submissions/1")
     assert response.status_code == 200
-    assert response.json()["verdict"] == "Accepted"
+    assert response.json()["status"] == "Accepted"
 
 def test_submit_endpoint_wrong_answer(client, monkeypatch):
     monkeypatch.setenv("JUDGE0_URL", "")
     client.post("/questions", json={
         "title": "Two Sum",
+        "slug": "two-sum",
         "difficulty": "Easy",
-        "statement": "Find two numbers"
+        "description": "Find two numbers"
     })
     client.post("/questions/1/testcases", json={
-        "input_data": "2 7\n9",
+        "input": "2 7\n9",
         "expected_output": "0 1",
         "is_hidden": False
     })

@@ -1,127 +1,120 @@
-# Coding Assessment Execution Service (LeetCode/HackerRank clone backend)
+# DevArena AI-Powered Coding Practice Platform
 
-A production-ready Coding Assessment Execution Service utilizing **FastAPI**, **PostgreSQL**, **SQLAlchemy**, and a real **Judge0 CE** instance running locally via Docker on Windows (WSL2).
+DevArena is a highly optimized, production-ready coding practice and evaluation platform. It utilizes a **FastAPI** backend API, **PostgreSQL** database, **Redis** enqueuing system, a customized lightweight **Judge0 CE** execution sandbox, and a separate microservice-based **AI Service** for code reviews and progressive suggestions.
+
+Designed to run efficiently on small virtual private servers (2 vCPUs, 4 GB RAM), the stack has been optimized from over 15 GB down to less than 1.2 GB by stripping out unused compiler runtimes and shifting static web evaluations (HTML/CSS) to client-side sandboxed frames.
 
 ---
 
-## Project Architecture
+## Unified Project Architecture
 
 ```mermaid
 graph TD
-    Client[Client / LMS Platform] -->|HTTP API /run or /submit| FastAPI[FastAPI Web Server]
-    FastAPI -->|PostgreSQL Schema / Read & Write| PostgreSQL[(PostgreSQL Database)]
-    FastAPI -->|HTTP Submission / polling| Judge0_API[Judge0 Server API]
-    Judge0_API -->|Task Queue| Redis[Redis Broker]
-    Redis -->|De-queue Task| Judge0_Worker[Judge0 Worker]
-    Judge0_Worker -->|Runs Sandbox| Isolate[Isolate Sandbox v2.0]
+    Client[Next.js Client / Monaco Web IDE] -->|HTTP API /run, /submit, /login| FastAPI[FastAPI Backend Server]
+    
+    %% Caching and Enqueuing
+    FastAPI -->|Cache-aside / Rate limits| Redis[(Redis Caching & Queue)]
+    RedisQueue[Redis Worker Queue] -->|Pulls submissions| WorkerDaemon[Asynchronous Grading Worker]
+    
+    %% Data Persistence
+    FastAPI -->|SQLAlchemy ORM| Postgres[(PostgreSQL Database)]
+    WorkerDaemon -->|Saves results / awards XP & Streaks| Postgres
+    
+    %% Sandbox & AI
+    WorkerDaemon -->|Runs Python / JS code| Judge0[Judge0 Sandboxed Exec Server]
+    FastAPI -->|Generates reviews / hint suggestions| AIService[AI Microservice]
+    
+    %% Web Sandbox
+    Client -->|Renders & validates HTML/CSS DOM| WebSandbox[Sandboxed Iframe Sandbox]
 ```
 
-- **`backend-web` (FastAPI):** Exposes routes for executing code runs, submission runs, questions management, and test case management.
-- **`backend-db` (Postgres):** Persists questions, test cases, and runs/submission history.
-- **`judge0-server`:** Standard Judge0 API endpoint for queueing and managing code execution submissions.
-- **`judge0-worker`:** Processes compiles and execution sandboxes.
-- **`judge0-redis`:** Queue broker for the worker.
-- **`judge0-db`:** Database for storing Judge0 tokens and configurations.
+### Services Overview
+1. **`backend-api` (FastAPI):** Orchestrates API routes, manages DB transactions, handles cache-aside mechanisms, exposes rate limiters, and runs the background worker thread.
+2. **`ai-service` (FastAPI):** Specialized microservice that generates code quality reviews and progressive hints.
+3. **`db` (Postgres 16):** Holds normalized relational data for questions, starter templates, tags, test cases, solutions, attempts, daily streaks, leaderboards, and badges.
+4. **`redis` (Redis 7):** Serves as the global cache, API rate limiter, and FIFO queue broker.
+5. **`server` / `worker` (Judge0 CE):** Executes user submissions under highly secure, cgroups v2-isolated runtimes (`isolate` sandbox v2.0).
 
 ---
 
-## WSL2 & Cgroups v2 Virtualization Fix
+## Features & Optimizations
 
-### 1. The Challenge
-WSL2 and modern Docker Desktop operate on **cgroups v2** (unified hierarchy). However, older versions of Judge0's underlying sandbox engine (`isolate` v1.8.1) strictly require **cgroups v1** (separate hierarchies like `/sys/fs/cgroup/memory`). 
-If cgroups v1 is unavailable:
-- Running `isolate` in non-cgroups mode forces a process limit of **exactly 1** (`RLIMIT_NPROC=1`).
-- This causes C++ compilers (`g++`) to crash with `Resource temporarily unavailable` (since compiling forks child processes).
-- This causes Java programs (`java`) to crash with `OutOfMemoryError: unable to create new native thread` (since the JVM requires multiple startup threads).
+### 1. Stripped Compiler Runtimes
+To run on cost-effective VPS nodes, the Judge0 compiler base image was refactored in [Dockerfile.compilers](file:///K:/lmes_portal/judge0/Dockerfile.compilers) to completely remove Java, Rust, Go, C++, PHP, Kotlin, Ruby, and 50+ other heavy runtimes. Only **Python 3** and **Node.js** execution pathways are preserved.
 
-### 2. The Solution
-We successfully patched the environment to run under **cgroup v2** with full sandboxing capabilities:
-1. **Upgraded Isolate:** We compiled `isolate` **v2.0** (which supports cgroups v2 natively) from source inside the worker container and replaced `/usr/local/bin/isolate`.
-2. **Created Custom Config:** Configured `/usr/local/etc/isolate` to use `cg_root = /sys/fs/cgroup` and `lock_root = /run/isolate/locks`.
-3. **Bypassed the "No Internal Processes" Constraint:** In cgroups v2, a parent group cannot have children if it contains processes. Inside Docker, all container processes reside in the root (`/sys/fs/cgroup`). We automated a startup wrapper command in `docker-compose.yml` that:
-   - Creates a sub-cgroup `/sys/fs/cgroup/init`.
-   - Moves all container processes to `/sys/fs/cgroup/init/cgroup.procs`.
-   - Enables subtree controllers (`+cpu +memory +pids +cpuset`) on the root, allowing `isolate` to safely create sub-cgroup sandboxes (`/sys/fs/cgroup/box-<ID>`) with full resource limits.
-4. **Re-enabled cgroups in Judge0:** Modified Judge0's `isolate_job.rb` to run with `@cgroups = "--cg"` and removed deprecated flags (`--cg-timing`) not present in cgroup v2.
+### 2. Client-Side Web Sandbox (Task 7)
+Web questions (HTML/CSS) bypass Judge0 servers entirely to save resources. They render inside a secure `iframe` with `sandbox="allow-scripts"` and undergo automated DOM and Tailwind CSS class check validation:
+* **Required Elements:** Verifies existence of required components (e.g. `button#submit-btn`).
+* **Required CSS Styling:** Validates layout configurations (e.g. `bg-blue-600`, `text-white`, `px-4`, `py-2`, `rounded`).
+* **JavaScript Functionality:** Simulates click actions or script execution.
+
+### 3. Redis Queue & Caching (Task 3)
+* **Asynchronous Submissions:** When a user submits code, it is enqueued into Redis and processed out-of-band by a background daemon. Users poll the endpoint for instant updates.
+* **Cache-aside Layer:** Public questions, test cases, and leaderboard rosters are cached in Redis. Writes instantly invalidate caches to prevent stale reads.
+* **API Rate Limiting:** Prevent brute-forcing of `/run`, `/submit`, and `/login` using sliding-window rate limits.
+
+### 4. Progressive AI Learning System (Task 8)
+* **Attempt-based Hints:** Suggests progressive hints (Stage 1: Small hint, Stage 2: Detailed hint, Stage 3: Approach) before unlocking the verified solutions and O-notation complexity information on attempt 4.
+* **AI Code Reviews:** Triggers service-to-service calls to `ai-service` to review code efficiency, identify bugs, and recommend refactoring.
 
 ---
 
-## API Endpoints Reference
+## Getting Started (Local Run)
 
-### Questions
-- **`GET /questions`**: List all assessment questions.
-- **`POST /questions`**: Create a new coding question.
+### 1. Build the Lightweight Compilers Image
+Ensure Docker Desktop (with WSL2 back-end) is running, and build the lightweight runtime container:
+```bash
+docker build -t judge0-compilers:lightweight -f judge0/Dockerfile.compilers ./judge0
+```
+
+### 2. Start the Unified Compose Stack
+Spin up the entire decoupled microservices stack:
+```bash
+docker compose up -d
+```
+
+### 3. Seed Database Structures
+Seed the PostgreSQL schemas with initial data (Topics, Languages, Questions, Test cases, Hints, Solutions):
+```bash
+docker compose exec backend-api python app/seed/seed_data.py
+```
+
+### 4. Open the Web IDE
+Access the Monaco Editor-based single-page workspace:
+* **URL:** [http://localhost:8000/](http://localhost:8000/)
+
+---
+
+## API References
+
+### Authentication (Rate Limited)
+* `POST /login` - Student/Admin login authentication.
+
+### Questions & Problems
+* `GET /questions` - Retrieve cached list of all questions.
+* `POST /questions` - (Admin) Create a question.
+* `DELETE /questions/{id}` - (Admin) Delete a question.
+* `POST /questions/{id}/duplicate` - (Admin) Duplicate an existing question.
 
 ### Test Cases
-- **`GET /questions/{question_id}/testcases`**: Get test cases for a question.
-- **`POST /questions/{question_id}/testcases`**: Create a test case.
+* `GET /questions/{id}/testcases` - Retrieve test cases for a question.
+* `POST /questions/{id}/testcases` - (Admin) Create a test case.
 
-### Runs & Submissions
-- **`POST /run`**: Run ad-hoc code against custom input.
-- **`POST /submit`**: Submit code to be evaluated against all test cases of a question.
+### Execution & Submissions
+* `POST /run` - Run code against custom stdin input.
+* `POST /submit` - Enqueue submission for full evaluation.
+* `GET /submissions/{id}` - Poll submission grading state.
 
----
-
-## Web Frontend Interface
-
-A premium, dark-mode Web IDE is served directly at the root of the FastAPI server:
-- **URL**: `http://localhost:8000/`
-- **Features**: Interactive problem selector (populated from the questions database), language switching (Python 3, C++ 17, Java 11), Monaco Editor (VS Code core) code editing, custom stdin input area, live compile/run results (stdout, stderr, execution time, memory usage), and submission verification against hidden test cases.
-
----
-
-## Getting Started
-
-### 1. Start Services
-Ensure Docker Desktop is running. Start the Judge0 services and the backend application:
-
-```powershell
-# Navigate to judge0 directory and run compose
-cd K:\lmes_portal\judge0
-docker compose up -d
-
-# Navigate to backend directory and run compose
-cd K:\lmes_portal\backend
-docker compose up -d --build
-```
-
-### 2. Auto-Configuration of Cgroups
-The worker container is configured to run as `user: root` and will automatically configure the cgroup v2 controllers on startup.
-To install the custom `isolate` v2.0 compiler inside the container, we execute the automated install script:
-
-```powershell
-# Copy install script to worker container
-docker cp C:\Users\hariv\.gemini\antigravity-cli\brain\761e8575-1bdf-4d3e-957c-a16fc85f824f\scratch\install_isolate.sh judge0-worker-1:/tmp/install_isolate.sh
-
-# Run install script
-docker exec --user root judge0-worker-1 bash /tmp/install_isolate.sh
-```
+### Gamification & Learning
+* `GET /leaderboard` - Fetch top developers ranked by XP (cached).
+* `GET /questions/{id}/stage` - Fetch next progressive AI hint stage.
+* `POST /attempts/{attempt_id}/feedback` - Get AI Code review feedback.
 
 ---
 
 ## Running Automated Tests
 
-Run the complete test suite inside the FastAPI container:
-
-```powershell
-# Run backend unit tests and integration tests
-docker exec -e PYTHONPATH=/workspace backend-web-1 pytest
+To execute the unit test suite inside the FastAPI container:
+```bash
+docker compose exec backend-api pytest
 ```
-
-To run only the Judge0 sandbox integration test (testing Python, C++, and Java execution against the real sandbox):
-
-```powershell
-docker exec -e JUDGE0_URL=http://host.docker.internal:2358 backend-web-1 python app/tests/test_judge0_integration.py
-```
-
----
-
-## Developer & Integration Guides
-
-*   **Adding Questions & Templates:** See [QUESTIONS_GUIDE.md](file:///K:/lmes_portal/QUESTIONS_GUIDE.md) for step-by-step instructions on creating questions, constructing boilerplate templates, and seeding test cases.
-*   **Lightweight Judge0 Deployment:** See [LIGHTWEIGHT_DEPLOYMENT.md](file:///K:/lmes_portal/judge0/LIGHTWEIGHT_DEPLOYMENT.md) to build a custom compilers image and reduce Judge0's size from 15GB to 1.2GB (supporting only Python & Java).
-*   **Production Deployment Playbook:** See [DEPLOYMENT.md](file:///K:/lmes_portal/DEPLOYMENT.md) for network setups, single-server/multi-server configurations, and private cloud deployment checklists.
-*   **Backend Integration Playbook:** See [INTEGRATION_GUIDE.md](file:///K:/lmes_portal/INTEGRATION_GUIDE.md) for details on extending the backend, adding new languages, batching requests, or linking with LMS platforms.
-*   **AI Agent Context Handoff:** For AI coding agents needing to restore system context, history, and configuration states, see [PROJECT_CONTEXT.md](file:///K:/lmes_portal/PROJECT_CONTEXT.md).
-
-

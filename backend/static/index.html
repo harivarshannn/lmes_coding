@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Coding Practice Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="logo-container">
+            <i class="fa-solid fa-graduation-cap logo-icon"></i>
+            <span class="logo-text">DevArena <span class="logo-subtext">AI</span></span>
+        </div>
+        
+        <!-- Gamification Widgets in Header -->
+        <div class="header-widgets">
+            <div class="widget streak-widget" title="Daily Streak">
+                <i class="fa-solid fa-fire widget-icon fire-glow"></i>
+                <span id="streak-count">0</span> Days
+            </div>
+            <div class="widget xp-widget" title="Earned Experience Points">
+                <i class="fa-solid fa-star widget-icon star-glow"></i>
+                <span id="xp-count">0</span> XP
+            </div>
+            <div class="status-container">
+                <div class="status-dot"></div>
+                <span id="platform-status">Redis Queue Connected</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+        
+        <!-- Sidebar Panel: Questions & Leaderboard -->
+        <div class="sidebar-panel">
+            <div class="tabs-header">
+                <div id="side-tab-questions" class="side-tab active" onclick="switchSideTab('questions')">Problems</div>
+                <div id="side-tab-leaderboard" class="side-tab" onclick="switchSideTab('leaderboard')">Leaderboard</div>
+            </div>
+            
+            <!-- Questions Browser Tab -->
+            <div id="side-content-questions" class="side-tab-content active">
+                <div class="panel-header">
+                    <div class="selector-label">Topic</div>
+                    <select id="topic-select" onchange="filterQuestions()">
+                        <option value="all">All Topics</option>
+                    </select>
+                    
+                    <div class="selector-label" style="margin-top: 10px;">Select Problem</div>
+                    <select id="question-select" onchange="loadQuestion()">
+                        <option value="">Loading problems...</option>
+                    </select>
+                </div>
+                
+                <!-- Question Statement Details -->
+                <div class="question-content">
+                    <div class="meta-row">
+                        <span id="diff-badge" class="difficulty-badge">--</span>
+                        <span id="estimated-time" class="meta-badge"><i class="fa-regular fa-clock"></i> -- mins</span>
+                        <span id="question-marks" class="meta-badge"><i class="fa-solid fa-award"></i> -- XP</span>
+                    </div>
+                    <div id="q-title" class="question-title">Loading...</div>
+                    <div id="q-statement" class="question-statement">Select a problem to start coding.</div>
+                    
+                    <!-- AI Hint Reveal Component -->
+                    <div class="ai-hint-box">
+                        <div class="hint-header">
+                            <span class="hint-title"><i class="fa-solid fa-lightbulb"></i> AI Hints & Approach</span>
+                            <button id="reveal-hint-btn" class="btn btn-sm btn-outline" onclick="revealNextHint()">
+                                <i class="fa-solid fa-eye"></i> Get Hint
+                            </button>
+                        </div>
+                        <div id="hint-body" class="hint-body">
+                            No hints revealed yet. Complete code attempts to unlock progressive hints!
+                        </div>
+                        <div id="solution-section" class="solution-section" style="display: none;">
+                            <div class="solution-header">
+                                <i class="fa-solid fa-code"></i> AI Verified Solution
+                            </div>
+                            <div class="solution-explanation" id="solution-explanation"></div>
+                            <div class="complexity-info" id="solution-complexity">Complexity: </div>
+                            <pre class="solution-code" id="solution-code"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Leaderboard Tab -->
+            <div id="side-content-leaderboard" class="side-tab-content">
+                <div class="leaderboard-container">
+                    <div class="leaderboard-header">
+                        <i class="fa-solid fa-trophy"></i> Top Developers
+                    </div>
+                    <div class="leaderboard-list" id="leaderboard-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Editor Panel -->
+        <div class="editor-panel">
+            <div class="editor-controls">
+                <div class="control-group">
+                    <select id="lang-select" style="width: 140px; padding: 6px 10px;" onchange="updateLanguage()">
+                        <option value="python">Python 3</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="sql">SQL (SQLite)</option>
+                        <option value="html">HTML5 / CSS3</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <button id="run-btn" class="btn btn-primary" onclick="runCode()">
+                        <i class="fa-solid fa-play"></i> Run Code
+                    </button>
+                    <button id="submit-btn" class="btn btn-success" onclick="submitCode()">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Submit Code
+                    </button>
+                </div>
+            </div>
+
+            <!-- Monaco Editor wrapper -->
+            <div class="editor-container-wrapper">
+                <div id="editor-container"></div>
+            </div>
+
+            <!-- Console Area -->
+            <div class="console-panel">
+                <div class="console-tabs">
+                    <div id="tab-input" class="console-tab active" onclick="switchConsoleTab('input')">Custom Input (stdin)</div>
+                    <div id="tab-output" class="console-tab" onclick="switchConsoleTab('output')">Run Result</div>
+                    <div id="tab-preview" class="console-tab" style="display: none;" onclick="switchConsoleTab('preview')">Live Web Sandbox</div>
+                    <div id="tab-submit" class="console-tab" onclick="switchConsoleTab('submit')">Submission Outcome</div>
+                    <div id="tab-ai-feedback" class="console-tab" onclick="switchConsoleTab('ai-feedback')">AI Code Review</div>
+                </div>
+                <div class="console-body">
+                    
+                    <!-- Tab: Custom input (stdin) -->
+                    <div id="content-input" class="tab-content active">
+                        <textarea id="stdin-area" class="stdin-input" placeholder="Specify inputs (one line per variable)..."></textarea>
+                    </div>
+
+                    <!-- Tab: Live Web Preview (Sandboxed iframe) -->
+                    <div id="content-preview" class="tab-content" style="height: 100%;">
+                        <div class="preview-toolbar">
+                            <span class="preview-badge"><i class="fa-solid fa-shield-halved"></i> Sandboxed Environment</span>
+                            <span id="preview-validation-badge" class="validation-badge validation-idle">Validation Idle</span>
+                        </div>
+                        <iframe id="preview-iframe" sandbox="allow-scripts" class="sandbox-iframe"></iframe>
+                    </div>
+
+                    <!-- Tab: Run Code Result -->
+                    <div id="content-output" class="tab-content">
+                        <div class="metrics-grid">
+                            <div class="metric-card">
+                                <span class="metric-label">Verdict</span>
+                                <span id="run-verdict" class="metric-value">--</span>
+                            </div>
+                            <div class="metric-card">
+                                <span class="metric-label">Status</span>
+                                <span id="run-status" class="metric-value">--</span>
+                            </div>
+                            <div class="metric-card">
+                                <span class="metric-label">CPU Time</span>
+                                <span id="run-time" class="metric-value">--</span>
+                            </div>
+                            <div class="metric-card">
+                                <span class="metric-label">Memory</span>
+                                <span id="run-memory" class="metric-value">--</span>
+                            </div>
+                        </div>
+                        <div class="selector-label" style="margin-bottom: 6px;">stdout</div>
+                        <div id="run-stdout" class="terminal-container terminal-success">No output.</div>
+                        <div class="selector-label" style="margin-top: 12px; margin-bottom: 6px;">stderr / compile log</div>
+                        <div id="run-stderr" class="terminal-container terminal-error">No error logs.</div>
+                    </div>
+
+                    <!-- Tab: Submit Code Result -->
+                    <div id="content-submit" class="tab-content">
+                        <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="metric-card">
+                                <span class="metric-label">Verdict</span>
+                                <span id="sub-verdict" class="metric-value">--</span>
+                            </div>
+                            <div class="metric-card">
+                                <span class="metric-label">Passed Cases</span>
+                                <span id="sub-passed" class="metric-value">--</span>
+                            </div>
+                            <div class="metric-card">
+                                <span class="metric-label">Total Cases</span>
+                                <span id="sub-total" class="metric-value">--</span>
+                            </div>
+                        </div>
+                        <div id="submit-result-text" class="result-message">
+                            No submissions made yet. Click Submit above to run code against hidden test cases.
+                        </div>
+                    </div>
+                    
+                    <!-- Tab: AI Code Review -->
+                    <div id="content-ai-feedback" class="tab-content">
+                        <div class="ai-feedback-container">
+                            <div class="feedback-card">
+                                <div class="feedback-header">
+                                    <i class="fa-solid fa-robot"></i> AI Code Quality Review
+                                </div>
+                                <div id="ai-feedback-content" class="feedback-body">
+                                    Submit your code to generate a full AI feedback analysis.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monaco Editor Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>

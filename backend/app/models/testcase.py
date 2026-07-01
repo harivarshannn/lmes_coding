@@ -8,7 +8,7 @@ class TestCase(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False)
-    input_data = Column(Text, nullable=False)
+    input = Column(Text, nullable=False) # Renamed from input_data to input
     expected_output = Column(Text, nullable=False)
     is_hidden = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

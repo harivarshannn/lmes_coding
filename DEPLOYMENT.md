@@ -1,116 +1,136 @@
 # Production Deployment Playbook
 
-This playbook explains how to transition the Coding Assessment Execution Service from a local Windows development environment (WSL2 / Docker Desktop) to a production-grade cloud deployment.
+This playbook explains how to transition the DevArena Coding Practice Platform from local development to a production-grade cloud environment.
 
 ---
 
-## 1. How the Backend Connects to Judge0 in Production
+## 1. Internal Connection Registry
 
-In development under Windows, WSL2 acts as a virtual machine. In production, your cloud server will run a **native Linux OS** (such as Ubuntu 22.04 LTS), so WSL is not required.
-
-The backend communicates with Judge0 using the `JUDGE0_URL` environment variable:
-*   **Locally:** `JUDGE0_URL=http://host.docker.internal:2358`
-*   **In Production:** This will be changed to the internal Docker service name (e.g., `http://judge0-server:2358`) or the private IP address of your dedicated Judge0 server.
+In production, the services communicate using internal Docker network DNS names:
+* **Database Connection:** `DATABASE_URL=postgresql+psycopg2://postgres:securepassword@db:5432/coding_platform`
+* **Redis Cache & Queue Broker:** `REDIS_URL=redis://:securepassword@redis:6379/0`
+* **Judge0 Sandbox API:** `JUDGE0_URL=http://server:2358`
+* **AI microservice:** `AI_SERVICE_URL=http://ai-service:8080`
 
 ---
 
-## 2. Deployment Architectures
+## 2. Production Docker Architecture (Single VPS)
 
-### Option A: Single-Server Deployment (Docker Compose) — *Easiest & Cost-Effective*
-In this setup, your FastAPI application, database, and Judge0 components all run on a single Virtual Private Server (VPS) (e.g., AWS EC2, DigitalOcean Droplet, Linode) using Docker Compose.
+For a standard VPS node (2 vCPUs, 4 GB RAM), we run a unified isolated bridge network setup. The databases are isolated on an internal network, and only the FastAPI gateway exposing port `8000` is open to the public internet (or proxied behind Nginx/SSL).
 
-#### Step 1: Combine the Networks
-Create a single `docker-compose.prod.yml` file that places both your backend app and Judge0 services on the same Docker bridge network.
+### Production `docker-compose.yml` Structure
 
 ```yaml
 version: "3.8"
 
-networks:
-  lmes-network:
-    driver: bridge
-
 services:
-  # --- Backend Services ---
-  web:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql+psycopg2://postgres:securepassword@db:5432/coding_platform
-      - JUDGE0_URL=http://judge0-server:2358  # Internal Docker DNS
-    networks:
-      - lmes-network
-    depends_on:
-      - db
-
+  # Database Storage (Isolated)
   db:
-    image: postgres:16.2
+    image: postgres:16-alpine
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=securepassword
       - POSTGRES_DB=coding_platform
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    networks:
-      - lmes-network
-
-  # --- Judge0 Services ---
-  judge0-server:
-    image: judge0/judge0:latest # Or your custom lightweight image
     ports:
-      - "2358:2358"
-    privileged: true
+      - "127.0.0.1:5432:5432" # Local access only
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
     networks:
-      - lmes-network
+      - backend-net
 
-  judge0-worker:
-    image: judge0/judge0:latest
+  # Redis Caching, Limiting & Queue (Isolated)
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "securepassword"]
+    ports:
+      - "127.0.0.1:6379:6379" # Local access only
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - backend-net
+
+  # Custom Compilers Judge0 server (Isolated)
+  server:
+    image: judge0-server:custom
+    volumes:
+      - ./judge0/judge0.conf:/judge0.conf:ro
+    privileged: true
+    restart: unless-stopped
+    networks:
+      - backend-net
+
+  worker:
+    image: judge0-worker:custom
     privileged: true
     user: root
+    restart: unless-stopped
     networks:
-      - lmes-network
-    # Include cgroup v2 startup command here...
-    
-  # Redis and Judge0 DB services here...
+      - backend-net
+
+  # AI Service Microservice (Isolated)
+  ai-service:
+    image: devarena-ai:latest
+    restart: unless-stopped
+    networks:
+      - backend-net
+
+  # Web API Gateway (Exposed)
+  backend-api:
+    image: devarena-backend:latest
+    ports:
+      - "8000:8000" # Public gateway
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:securepassword@db:5432/coding_platform
+      - JUDGE0_URL=http://server:2358
+      - REDIS_URL=redis://:securepassword@redis:6379/0
+      - AI_SERVICE_URL=http://ai-service:8080
+    depends_on:
+      - db
+      - redis
+      - server
+    restart: unless-stopped
+    networks:
+      - frontend-net
+      - backend-net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  frontend-net:
+  backend-net:
 ```
 
 ---
 
-### Option B: Scaled Deployment (Multi-Server) — *Recommended for Production*
-For high traffic, you should separate the backend API from the execution workers. Running untrusted code on the same server hosting your main API can cause latency spikes.
+## 3. Production Hardening Checklist
 
-```
-                  [ Student Client ]
-                           │
-                           ▼
-              ┌────────────────────────┐
-              │   Node.js LMS Portal   │
-              └────────────┬───────────┘
-                           │ (Internal API call)
-                           ▼
-              ┌────────────────────────┐
-              │  FastAPI API Backend   │
-              └────────────┬───────────┘
-                           │ (HTTP request via Private Network)
-                           ▼
-              ┌────────────────────────┐
-              │  Dedicated Judge0 VM   │
-              └────────────────────────┘
-```
+### 1. Configure Host Cgroups v2
+Native cgroups v2 must be enabled on the host Linux kernel (Ubuntu 22.04 LTS handles this automatically). The Judge0 worker requires privileged status to mount the box sandboxes under `/sys/fs/cgroup`.
 
-1.  **Server 1 (API Server):** Run your FastAPI backend connected to your managed production database (e.g. AWS RDS PostgreSQL).
-2.  **Server 2 (Sandbox Server):** Run Judge0 on a separate, dedicated virtual machine. Set the security group to only allow incoming requests on port `2358` from Server 1's private IP.
-3.  **Connection:** Set the FastAPI environment variable `JUDGE0_URL=http://<private-ip-of-server-2>:2358`.
+### 2. Sandbox Security Controls
+Ensure network connectivity is disabled for executions run inside Judge0 to prevent students from requesting external APIs or conducting DDOS attacks:
+* Set `allow_network = false` in your `judge0.conf` file.
+* Restrict execution resources to prevent Fork Bombs or memory hogging:
+  * Maximum execution time: `5.0` seconds.
+  * Maximum memory limit: `256` MB.
+  * Maximum process forks: `15`.
 
----
+### 3. API Protection (Sliding Window Limits)
+Our Redis implementation in `backend/app/utils/rate_limit.py` protects endpoints from brute force:
+* `/run` and `/submit` are limited to **5 invocations per minute** per client IP.
+* `/login` is limited to **5 attempts per minute** to prevent account cracking.
 
-## 3. Important Production Checklist
-
-### 1. Enable Cgroups v2 on the Linux Host
-Since Judge0 runs compiles and runs in the `isolate` sandbox using cgroups, your host Linux kernel must support cgroups v2. Native Ubuntu 22.04 LTS has cgroups v2 enabled out of the box.
-
-### 2. Configure Proper Resource Limits
-Ensure you configure production limits in `judge0.conf` to prevent malicious submissions from locking up your server (e.g. limiting CPU time to 5 seconds, memory to 256MB, and disabling network access for sandboxed runs).
-
-### 3. Database backups
-Configure daily database dumps for your PostgreSQL databases (`coding_platform` and `judge0`) to prevent data loss.
+### 4. Database Schema Migrations (Alembic)
+To upgrade schema structures in production without deleting data:
+1. Generate the migration file on the host:
+   ```bash
+   docker compose exec backend-api alembic revision --autogenerate -m "Add index fields"
+   ```
+2. Apply the migration online:
+   ```bash
+   docker compose exec backend-api alembic upgrade head
+   ```

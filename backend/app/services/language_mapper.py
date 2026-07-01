@@ -2,12 +2,8 @@ from app.utils.exceptions import InvalidLanguageException
 
 LANGUAGE_MAP = {
     "python": 71,
-    "java": 62,
     "javascript": 63,
-    "typescript": 74,
-    "sql": 82,
-    "html": 71,   # Evaluated via Python 3 validator script
-    "react": 71   # Evaluated via Python 3 validator script
+    "sql": 82
 }
 
 def get_language_id(language: str) -> int:

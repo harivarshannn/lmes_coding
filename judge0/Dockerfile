@@ -78,7 +78,8 @@ COPY --from=isolate-builder /usr/local/bin/isolate /usr/local/bin/isolate
 COPY --from=isolate-builder /usr/local/etc/isolate /usr/local/etc/isolate
 
 # Setup isolate config cgroups paths
-RUN echo "cg_root = /sys/fs/cgroup\nlock_root = /run/isolate/locks" > /usr/local/etc/isolate
+# Setup isolate config cgroups paths
+RUN sed -i 's|cg_root = auto:/run/isolate/cgroup|cg_root = /sys/fs/cgroup|g' /usr/local/etc/isolate
 
 # Copy Pre-compiled Gems from Stage 2
 COPY --from=gems-builder /opt/.gem/ /opt/.gem/
@@ -99,7 +100,8 @@ ENTRYPOINT ["/api/docker-entrypoint.sh"]
 
 # Setup non-privileged sandbox execution user
 RUN useradd -u 1000 -m -r judge0 && \
-    echo "judge0 ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers && \
+    echo "judge0 ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/judge0 && \
+    chmod 0440 /etc/sudoers.d/judge0 && \
     chown judge0: /api/tmp/
 
 USER judge0

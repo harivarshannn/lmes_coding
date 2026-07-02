@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
+import app.database.base
 from app.routes import health, questions, testcases, run, submissions, auth, learning, leaderboard
 from app.utils.exceptions import CodingPlatformException
 from app.services.submission_service import start_background_worker

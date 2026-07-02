@@ -97,6 +97,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8008:8000"
+    volumes:
+      - ./backend:/workspace
     environment:
       - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/coding_platform
       - JUDGE0_URL=http://server:2358

@@ -1,5 +1,6 @@
 from datetime import datetime, date
-from app.database.session import SessionLocal, Base, engine
+from app.database.session import SessionLocal, engine
+from app.database.base import Base
 from app.models.topic import Topic
 from app.models.question import Question
 from app.models.language import Language

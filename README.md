@@ -61,27 +61,40 @@ Web questions (HTML/CSS) bypass Judge0 servers entirely to save resources. They 
 
 ## Getting Started (Local Run)
 
-### 1. Build the Lightweight Compilers Image
-Ensure Docker Desktop (with WSL2 back-end) is running, and build the lightweight runtime container:
+### 1. Start the Unified Compose Stack
+Spin up the entire decoupled microservices stack (the custom multi-stage compilation for the Judge0 worker is built automatically on the first boot):
 ```bash
-docker build -t judge0-compilers:lightweight -f judge0/Dockerfile.compilers ./judge0
+docker compose up --build -d
 ```
 
-### 2. Start the Unified Compose Stack
-Spin up the entire decoupled microservices stack:
+### 2. Seed Database Structures
+Seed the PostgreSQL schemas with initial database structures (Languages, Databases/DS Topics, SQL/Python Questions, Test cases, Hints, and Solutions):
 ```bash
-docker compose up -d
+docker compose exec backend-api python -m app.seed.seed_data
 ```
 
-### 3. Seed Database Structures
-Seed the PostgreSQL schemas with initial data (Topics, Languages, Questions, Test cases, Hints, Solutions):
+### 3. (Optional) Local Development & Host Venv Setup
+To run scripts, debuggers, or execute unit tests locally outside Docker, set up the Python virtual environment:
 ```bash
-docker compose exec backend-api python app/seed/seed_data.py
+# Navigate to the backend folder
+cd backend
+
+# Create the virtual environment
+python -m venv venv
+
+# Activate the virtual environment
+# On Windows (PowerShell):
+.\venv\Scripts\Activate.ps1
+# On Linux/macOS/WSL2:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
 ### 4. Open the Web IDE
 Access the Monaco Editor-based single-page workspace:
-* **URL:** [http://localhost:8000/](http://localhost:8000/)
+* **URL:** [http://localhost:8008/](http://localhost:8008/)
 
 ---
 

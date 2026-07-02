@@ -1,4 +1,7 @@
-# DEPRECATED / SUPERSEDED
-# The compilers setup is now handled automatically via a multi-stage Docker build 
-# inside the main judge0/Dockerfile.
-# Run `docker compose up --build` from the root directory to build the stack directly.
+# LEGACY BASE COMPILERS IMAGE PLACEHOLDER
+# Note: The compilers setup is now handled automatically via a multi-stage Docker build
+# inside the main judge0/Dockerfile. You can run the stack directly using:
+# docker compose up --build -d
+
+FROM ubuntu:22.04
+RUN echo "Compilers setup is now handled via multi-stage builds. This image is a legacy placeholder."

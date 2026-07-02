@@ -46,7 +46,7 @@ RUN RAILS_ENV=production bundle
 # ========================================================
 # STAGE 3: Production Runtime Sandbox Environment
 # ========================================================
-FROM ruby:3.0-slim AS production
+FROM ruby:3.0-slim AS production-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH "/usr/bin:/opt/.gem/bin:$PATH"
@@ -94,9 +94,8 @@ RUN cat /etc/cron.d/* | crontab -
 # Copy application source code
 COPY . .
 
-# Setup entrypoint and start command
+# Setup entrypoint
 ENTRYPOINT ["/api/docker-entrypoint.sh"]
-CMD ["/api/scripts/server"]
 
 # Setup non-privileged sandbox execution user
 RUN useradd -u 1000 -m -r judge0 && \
@@ -109,5 +108,9 @@ ENV JUDGE0_VERSION "1.13.1"
 LABEL version=$JUDGE0_VERSION
 
 # Development Target
-FROM production AS development
+FROM production-base AS development
 CMD ["sleep", "infinity"]
+
+# Production Target (Default)
+FROM production-base AS production
+CMD ["/api/scripts/server"]

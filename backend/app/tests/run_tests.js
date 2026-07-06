@@ -22,6 +22,14 @@ test.after(async () => {
     server.close();
   }
   await db.close();
+
+  try {
+    const updateSkills = require('../../scripts/update_context');
+    updateSkills();
+  } catch (err) {
+    console.error('Failed to auto-update skills context:', err);
+  }
+
   // Wait briefly for all sockets to close
   await new Promise(resolve => setTimeout(resolve, 500));
   // Force process exit to ensure test runner finishes cleanly

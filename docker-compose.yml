@@ -115,6 +115,7 @@ services:
       - "8008:8000"
     volumes:
       - ./backend:/workspace
+      - ./skills:/workspace/skills
     environment:
       - DATABASE_URL=mongodb://mongodb:27017/coding_platform
       - JUDGE0_URL=http://server:2358

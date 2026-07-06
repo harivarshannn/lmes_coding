@@ -41,7 +41,7 @@ require(['vs/editor/editor.main'], function () {
     editor = monaco.editor.create(document.getElementById('editor-container'), {
         value: defaultTemplates.python,
         language: 'python',
-        theme: 'vs-dark',
+        theme: 'vs',
         automaticLayout: true,
         fontFamily: 'JetBrains Mono, monospace',
         fontSize: 14,

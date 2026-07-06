@@ -23,6 +23,14 @@ Automatically activate when:
 
 ---
 
+## 📋 Standard Handoff Process
+After completing any development or refactoring task:
+1. **Always push the changes to GitHub** (commit and push to the remote repository).
+2. **Always draft a summary update email in the chat** for the user (explaining changes, test status, and remaining work) since mail MCP may not be connected.
+3. **Always update the project context** under the "Full Project Context" section in this `SKILL.md` file.
+
+---
+
 ## 🚀 The MongoDB Schema & Constraints Reference
 
 ### 1. Integer Auto-Increment IDs
@@ -78,6 +86,8 @@ wsl -d Ubuntu docker compose exec backend-api wget --no-verbose --tries=1 --spid
 * Swapped out `postgres` in the main application flow for a `mongo:6-jammy` container.
 * Preserved the `db` (PostgreSQL 16) container **only** as an internal runtime queue/metadata store for Judge0 CE isolation.
 * Rebuilt the Docker Compose stack with custom network separation.
+* Redesigned DevArena UI (the "Forge" interactive version) to adopt the premium, glassmorphic Wrench Wise branding (emerald `#00B67A` and cyan `#00d294` accents, light workspace design, custom animations, rounded pills/badges, and a light-themed Monaco code editor workspace).
+* Built a static high-fidelity replication of Wrench Wise at `backend/static/pencil_mirror.html` (the static "Pencil" mirror).
 
 ### 2. Execution Health & Integration Tests:
 * All 7 containers are fully active, running, and healthy.

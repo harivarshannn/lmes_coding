@@ -99,3 +99,12 @@ wsl -d Ubuntu docker compose exec backend-api wget --no-verbose --tries=1 --spid
   * `POST /run` code sandbox validation
   * Submissions and Leaderboard database flow
 * Background submission queue worker loops on Redis and successfully evaluates python scripts in the Judge0 sandbox, updating MongoDB state correctly.
+
+### 3. Async Submission Polling Architecture (Implemented July 6, 2026):
+* **Problem Solved**: Browser HTTP timeout (50s) when Judge0 takes longer to execute code.
+* **Backend Changes**:
+  * `submission_service.js`: `enqueueSubmission()` always returns immediately. Redis fallback spawns fire-and-forget async task instead of blocking.
+  * `submissions.js`: Added `GET /submissions/:id/status` lightweight endpoint (returns only status, passed, total — no code/stdout).
+* **Frontend Changes**:
+  * `script.js`: `pollSubmission()` uses `/submissions/:id/status` every 2s, shows elapsed time, has 120s timeout guard, and transient network errors don't kill the polling loop.
+* **Flow**: POST /submit → DB record "In Queue" → Redis push → instant response → Worker processes → Frontend polls status → Final verdict displayed.

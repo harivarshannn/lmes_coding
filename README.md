@@ -1,6 +1,6 @@
 # DevArena AI-Powered Coding Practice Platform
 
-DevArena is a highly optimized, production-ready coding practice and evaluation platform. It utilizes a **FastAPI** backend API, **PostgreSQL** database, **Redis** enqueuing system, a customized lightweight **Judge0 CE** execution sandbox, and a separate microservice-based **AI Service** for code reviews and progressive suggestions.
+DevArena is a highly optimized, production-ready coding practice and evaluation platform. It utilizes a **Node.js (Express)** backend API, **MongoDB** database, **Redis** enqueuing system, a customized lightweight **Judge0 CE** execution sandbox, and a separate microservice-based **AI Service** for code reviews and progressive suggestions.
 
 Designed to run efficiently on small virtual private servers (2 vCPUs, 4 GB RAM), the stack has been optimized from over 15 GB down to less than 1.2 GB by stripping out unused compiler runtimes and shifting static web evaluations (HTML/CSS) to client-side sandboxed frames.
 
@@ -10,30 +10,31 @@ Designed to run efficiently on small virtual private servers (2 vCPUs, 4 GB RAM)
 
 ```mermaid
 graph TD
-    Client[Next.js Client / Monaco Web IDE] -->|HTTP API /run, /submit, /login| FastAPI[FastAPI Backend Server]
+    Client[Next.js Client / Monaco Web IDE] -->|HTTP API /run, /submit, /login| Express[Express Backend Server]
     
     %% Caching and Enqueuing
-    FastAPI -->|Cache-aside / Rate limits| Redis[(Redis Caching & Queue)]
+    Express -->|Cache-aside / Rate limits| Redis[(Redis Caching & Queue)]
     RedisQueue[Redis Worker Queue] -->|Pulls submissions| WorkerDaemon[Asynchronous Grading Worker]
     
     %% Data Persistence
-    FastAPI -->|SQLAlchemy ORM| Postgres[(PostgreSQL Database)]
-    WorkerDaemon -->|Saves results / awards XP & Streaks| Postgres
+    Express -->|MongoDB Driver| MongoDB[(MongoDB Database)]
+    WorkerDaemon -->|Saves results / awards XP & Streaks| MongoDB
     
     %% Sandbox & AI
     WorkerDaemon -->|Runs Python / JS code| Judge0[Judge0 Sandboxed Exec Server]
-    FastAPI -->|Generates reviews / hint suggestions| AIService[AI Microservice]
+    Express -->|Generates reviews / hint suggestions| AIService[AI Microservice]
     
     %% Web Sandbox
     Client -->|Renders & validates HTML/CSS DOM| WebSandbox[Sandboxed Iframe Sandbox]
 ```
 
 ### Services Overview
-1. **`backend-api` (FastAPI):** Orchestrates API routes, manages DB transactions, handles cache-aside mechanisms, exposes rate limiters, and runs the background worker thread.
+1. **`backend-api` (Express):** Orchestrates API routes, manages DB transactions, handles cache-aside mechanisms, exposes rate limiters, and runs the background worker thread.
 2. **`ai-service` (FastAPI):** Specialized microservice that generates code quality reviews and progressive hints.
-3. **`db` (Postgres 16):** Holds normalized relational data for questions, starter templates, tags, test cases, solutions, attempts, daily streaks, leaderboards, and badges.
-4. **`redis` (Redis 7):** Serves as the global cache, API rate limiter, and FIFO queue broker.
-5. **`server` / `worker` (Judge0 CE):** Executes user submissions under highly secure, cgroups v2-isolated runtimes (`isolate` sandbox v2.0).
+3. **`mongodb` (MongoDB 6):** Holds application data for questions, starter templates, tags, test cases, solutions, attempts, daily streaks, leaderboards, progress, and badges.
+4. **`db` (Postgres 16):** Used purely as an internal runtime queue/store for the Judge0 sandbox (no application/business data).
+5. **`redis` (Redis 7):** Serves as the global cache, API rate limiter, and FIFO queue broker.
+6. **`server` / `worker` (Judge0 CE):** Executes user submissions under highly secure, cgroups v2-isolated runtimes (`isolate` sandbox v2.0).
 
 ---
 
@@ -70,26 +71,17 @@ docker compose up --build -d
 ### 2. Seed Database Structures
 Seed the PostgreSQL schemas with initial database structures (Languages, Databases/DS Topics, SQL/Python Questions, Test cases, Hints, and Solutions):
 ```bash
-docker compose exec backend-api python -m app.seed.seed_data
+docker compose exec backend-api node app/seed/seed_data.js
 ```
 
-### 3. (Optional) Local Development & Host Venv Setup
-To run scripts, debuggers, or execute unit tests locally outside Docker, set up the Python virtual environment:
+### 3. (Optional) Local Development Setup
+To run scripts, debuggers, or execute unit tests locally outside Docker, set up Node.js:
 ```bash
 # Navigate to the backend folder
 cd backend
 
-# Create the virtual environment
-python -m venv venv
-
-# Activate the virtual environment
-# On Windows (PowerShell):
-.\venv\Scripts\Activate.ps1
-# On Linux/macOS/WSL2:
-source venv/bin/activate
-
 # Install dependencies
-pip install -r requirements.txt
+npm install
 ```
 
 ### 4. Open the Web IDE
@@ -127,7 +119,7 @@ Access the Monaco Editor-based single-page workspace:
 
 ## Running Automated Tests
 
-To execute the unit test suite inside the FastAPI container:
+To execute the unit test suite inside the Express container:
 ```bash
-docker compose exec backend-api pytest
+docker compose exec backend-api npm run test
 ```

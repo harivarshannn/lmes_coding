@@ -22,6 +22,22 @@ services:
     networks:
       - backend-net
 
+  # --- MongoDB Database Server ---
+  mongodb:
+    image: mongo:6-jammy
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - backend-net
+
   # --- Redis Message Broker ---
   redis:
     image: redis:7-alpine
@@ -100,19 +116,21 @@ services:
     volumes:
       - ./backend:/workspace
     environment:
-      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/coding_platform
+      - DATABASE_URL=mongodb://mongodb:27017/coding_platform
       - JUDGE0_URL=http://server:2358
       - REDIS_URL=redis://:redispassword@redis:6379/0
       - AI_SERVICE_URL=http://ai-service:8080
     depends_on:
       db:
         condition: service_healthy
+      mongodb:
+        condition: service_healthy
       redis:
         condition: service_healthy
       server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -135,6 +153,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  mongodb_data:
 
 networks:
   frontend-net:

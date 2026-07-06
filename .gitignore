@@ -58,3 +58,11 @@ judge0/.byebug_history
 judge0/coverage/
 judge0/srv/
 judge0/environment
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Backup files
+*_backup/

@@ -6,6 +6,9 @@ const TestCaseRepository = require('../repositories/testcase_repo');
 const UserRepository = require('../repositories/user_repo');
 const Evaluator = require('./evaluator');
 
+// Maximum time (ms) a submission can stay in Processing before being marked as timed out
+const SUBMISSION_TIMEOUT_MS = 120_000; // 2 minutes
+
 class SubmissionService {
   static async getLanguageByName(name) {
     const col = await db.collection('languages');
@@ -31,20 +34,25 @@ class SubmissionService {
     const isTesting = process.env.NODE_ENV === 'test' || typeof global.it === 'function';
 
     if (isTesting) {
+      // In test mode, run synchronously so assertions can verify results
       await this.processSubmission(dbSub.id);
       dbSub = await SubmissionRepository.getById(dbSub.id);
     } else {
+      // PRODUCTION: Always return immediately — never block the HTTP response
       try {
         await RedisQueue.push("submissions_queue", {
           submission_id: dbSub.id
         });
       } catch (e) {
-        console.error(`Redis enqueue failed: ${e.message}. Executing synchronously.`);
-        await this.processSubmission(dbSub.id);
-        dbSub = await SubmissionRepository.getById(dbSub.id);
+        // Redis is down: fire-and-forget async processing instead of blocking
+        console.error(`Redis enqueue failed: ${e.message}. Spawning async fallback.`);
+        this.processSubmission(dbSub.id).catch(err => {
+          console.error(`Async fallback processing failed for sub ${dbSub.id}:`, err);
+        });
       }
     }
 
+    // Always return the "In Queue" record immediately — frontend will poll for updates
     return dbSub;
   }
 

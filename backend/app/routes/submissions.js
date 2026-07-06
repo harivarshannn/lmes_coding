@@ -65,6 +65,30 @@ router.get('/submissions/:id', async (req, res, next) => {
   }
 });
 
+// Lightweight status-only endpoint for fast polling (no code/stdout payload)
+router.get('/submissions/:id/status', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const submission = await SubmissionRepository.getById(id);
+    if (!submission) {
+      return res.status(404).json({
+        error: {
+          code: "SUBMISSION_NOT_FOUND",
+          message: `Submission with ID ${id} not found`
+        }
+      });
+    }
+    res.json({
+      submission_id: submission.id,
+      status: submission.status,
+      passed: submission.passed,
+      total: submission.total
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/students/:student_id/submissions', async (req, res, next) => {
   try {
     const studentId = parseInt(req.params.student_id, 10);

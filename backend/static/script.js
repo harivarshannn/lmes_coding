@@ -464,13 +464,39 @@ function submitCode() {
     });
 }
 
-// Poll submission outcome until final verdict
+// Poll submission outcome until final verdict (Async Polling Architecture)
 function pollSubmission(subId) {
     const submitBtn = document.getElementById('submit-btn');
-    document.getElementById('submit-result-text').textContent = "Processing submission in Redis worker queue...";
+    const MAX_POLL_SECONDS = 120; // 2 minute max polling window
+    const POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
+    let elapsed = 0;
+    
+    document.getElementById('submit-result-text').textContent = "Processing submission in background worker...";
     
     const interval = setInterval(() => {
-        fetch(`/submissions/${subId}`)
+        elapsed += POLL_INTERVAL_MS / 1000;
+        
+        // Show elapsed time to user
+        document.getElementById('sub-verdict').textContent = 
+            elapsed <= 5 ? "In Queue..." : "Processing...";
+        document.getElementById('submit-result-text').textContent = 
+            `Evaluating test cases... (${Math.round(elapsed)}s elapsed)`;
+        
+        // Timeout guard: stop polling after MAX_POLL_SECONDS
+        if (elapsed >= MAX_POLL_SECONDS) {
+            clearInterval(interval);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Submit Code';
+            document.getElementById('sub-verdict').textContent = "Timeout";
+            document.getElementById('submit-result-text').innerHTML = 
+                '<span style="color: var(--accent-error); font-weight: 600;">' +
+                '<i class="fa-solid fa-clock"></i> Polling timed out after ' + MAX_POLL_SECONDS + 
+                's. Your submission is still being processed in the background. ' +
+                'Refresh the page to check the result.</span>';
+            return;
+        }
+        
+        fetch(`/submissions/${subId}/status`)
             .then(res => res.json())
             .then(data => {
                 const status = data.status;
@@ -487,10 +513,14 @@ function pollSubmission(subId) {
                     
                     if (status === 'Accepted') {
                         document.getElementById('submit-result-text').innerHTML = 
-                            '<span style="color: var(--accent-success); font-weight: 600;"><i class="fa-solid fa-circle-check"></i> Accepted! All Test Cases Passed.</span>';
+                            '<span style="color: var(--accent-success); font-weight: 600;">' +
+                            '<i class="fa-solid fa-circle-check"></i> Accepted! All Test Cases Passed. ' +
+                            '(' + Math.round(elapsed) + 's)</span>';
                     } else {
                         document.getElementById('submit-result-text').innerHTML = 
-                            '<span style="color: var(--accent-error); font-weight: 600;"><i class="fa-solid fa-circle-xmark"></i> Failed. Verdict: ' + status + '</span>';
+                            '<span style="color: var(--accent-error); font-weight: 600;">' +
+                            '<i class="fa-solid fa-circle-xmark"></i> Failed. Verdict: ' + status + 
+                            ' (' + Math.round(elapsed) + 's)</span>';
                     }
                     
                     // Fetch updated profile stats & leaderboard
@@ -501,12 +531,10 @@ function pollSubmission(subId) {
                 }
             })
             .catch(err => {
-                clearInterval(interval);
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Submit Code';
-                document.getElementById('submit-result-text').textContent = "Error fetching result: " + err.message;
+                // Don't kill the interval on transient network errors; just log
+                console.error("Poll error:", err.message);
             });
-    }, 1000);
+    }, POLL_INTERVAL_MS);
 }
 
 // AI Hints Reveal System (TASK 8)

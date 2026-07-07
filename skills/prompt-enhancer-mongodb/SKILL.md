@@ -106,6 +106,7 @@ wget --no-verbose --tries=1 --spider http://127.0.0.1:8008/health
 * Created the **MCQ Module** supporting quiz creation, random option shuffling, timing rules, and automatic grading.
 * Created the **Assignment Module** supporting assignment deadlines, template starter code, and auto-grading using the Judge0 sandbox alongside instructor manual grade overrides.
 * Created the **Bug Fixing Module** supporting debugging challenges, progressive attempt-based hints, and diff-based correction checks.
+* Migrated the database connection layer from native `mongodb` driver to `mongoose` ODM with full schema and model definitions for all 23 collections, providing 100% backwards-compatible wrapper layer to avoid repository query regressions.
 * Updated `db_init.js` and all seed files to initialize and populate MongoDB indexes and collections for all new modules.
 * Preserved 100% backward compatibility with existing code files by utilizing safe delegating wrappers under `modules/` and redirecting old utility files.
 * Integration tests updated to include 9 test suites covering all modules (Auth, Coding, MCQ, Assignment, Bugfix) with 100% success (all green checks).
@@ -113,3 +114,4 @@ wget --no-verbose --tries=1 --spider http://127.0.0.1:8008/health
 ### 2. Execution Health & Integration Tests:
 * All docker compose containers are active, healthy, and operational.
 * Background queue worker properly evaluates scripts in the Judge0 sandbox.
+* Backend running locally on port 8000 using Mongoose ODM, passing health tests.

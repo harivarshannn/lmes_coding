@@ -4,7 +4,7 @@ description: "Use when developing, debugging, or querying devArena with MongoDB.
 category: discipline
 risk: safe
 source: local
-date_added: "2026-07-06"
+date_added: "2026-07-07"
 metadata:
   category: discipline
   triggers: mongodb, mongo, seed_data, session, counters, nextSequenceValue, migration
@@ -50,10 +50,32 @@ To keep absolute compatibility with existing REST endpoints and frontend routers
 
 ### 2. Indexes and Collection Schemas
 Before deploying schemas, double-check that database indices are correctly generated inside `app/database/db_init.js`:
-* **Questions:** `{ slug: 1 }` (unique)
-* **Users:** `{ username: 1 }` (unique), `{ email: 1 }` (unique)
-* **Achievements:** `{ user_id: 1, badge_id: 1 }` (unique compound index)
-* **Progress:** `{ user_id: 1, question_id: 1 }` (unique compound index)
+* **Shared / Leaderboard:**
+  * `topics`: `{ name: 1 }` unique
+  * `languages`: `{ name: 1 }` unique, `{ judge0_language_id: 1 }` unique
+  * `badges`: `{ name: 1 }` unique
+  * `achievements`: `{ user_id: 1, badge_id: 1 }` unique
+  * `daily_streaks`: `{ user_id: 1 }` unique
+  * `leaderboard`: `{ user_id: 1 }` unique, `{ xp: -1 }`
+  * `progress`: `{ user_id: 1, question_id: 1 }` unique
+  * `bookmarks`: `{ user_id: 1, question_id: 1 }` unique
+  * `favorites`: `{ user_id: 1, question_id: 1 }` unique
+* **Coding Module:**
+  * `questions`: `{ slug: 1 }` unique
+  * `testcases`: `{ question_id: 1 }`
+  * `hints`: `{ question_id: 1 }`
+  * `solutions`: `{ question_id: 1 }`
+  * `submissions`: `{ student_id: 1 }`, `{ judge0_token: 1 }`
+* **MCQ Module:**
+  * `mcq_quizzes`: `{ slug: 1 }` unique, `{ topic_id: 1 }`
+  * `mcq_questions`: `{ quiz_id: 1 }`
+  * `mcq_attempts`: `{ user_id: 1, quiz_id: 1 }`, `{ user_id: 1 }`
+* **Assignment Module:**
+  * `assignments`: `{ slug: 1 }` unique, `{ topic_id: 1 }`
+  * `assignment_submissions`: `{ assignment_id: 1, user_id: 1 }` unique, `{ assignment_id: 1 }`
+* **Bugfix Module:**
+  * `bugfix_challenges`: `{ slug: 1 }` unique, `{ topic_id: 1 }`
+  * `bugfix_attempts`: `{ user_id: 1, challenge_id: 1 }`, `{ user_id: 1 }`
 
 ---
 
@@ -61,50 +83,33 @@ Before deploying schemas, double-check that database indices are correctly gener
 
 ### 1. Seeding and Initializing Database
 To drop and re-seed all collections with mock data:
-```bash
-wsl -d Ubuntu docker compose exec backend-api node app/seed/seed_data.js
-```
+* Local: `$env:DATABASE_URL="mongodb://localhost:27017/coding_platform"; npm run seed`
+* Docker: `docker compose exec backend-api node app/seed/seed_data.js`
 
 ### 2. Running Test Suite
 Always validate repository modifications using the integration tests:
-```bash
-wsl -d Ubuntu docker compose exec backend-api npm run test
-```
+* Local: `$env:DATABASE_URL="mongodb://localhost:27017/coding_platform"; npm run test`
+* Docker: `docker compose exec backend-api npm run test`
 
 ### 3. Native Health Check Verify
 Check if the Node.js API container is running and healthy:
 ```bash
-wsl -d Ubuntu docker compose exec backend-api wget --no-verbose --tries=1 --spider http://127.0.0.1:8000/health
+wget --no-verbose --tries=1 --spider http://127.0.0.1:8008/health
 ```
 
 ---
 
-## 📝 Full Project Context (Latest Status - July 6, 2026)
+## 📝 Full Project Context (Latest Status - July 7, 2026)
 
-### 1. Completed Migration:
-* Rewrote the backend API service completely from Python (FastAPI/SQLAlchemy) to Node.js (Express/MongoDB Driver).
-* Swapped out `postgres` in the main application flow for a `mongo:6-jammy` container.
-* Preserved the `db` (PostgreSQL 16) container **only** as an internal runtime queue/metadata store for Judge0 CE isolation.
-* Rebuilt the Docker Compose stack with custom network separation.
-* Redesigned DevArena UI (the "Forge" interactive version) to adopt the premium, glassmorphic Wrench Wise branding (emerald `#00B67A` and cyan `#00d294` accents, light workspace design, custom animations, rounded pills/badges, and a light-themed Monaco code editor workspace).
-* Built a static high-fidelity replication of Wrench Wise at `backend/static/pencil_mirror.html` (the static "Pencil" mirror).
+### 1. Completed Refactoring & Multi-Module Integration:
+* Restructured flat backend routing, services, and repositories into a modular domain-driven architecture under `app/modules/`.
+* Created the **MCQ Module** supporting quiz creation, random option shuffling, timing rules, and automatic grading.
+* Created the **Assignment Module** supporting assignment deadlines, template starter code, and auto-grading using the Judge0 sandbox alongside instructor manual grade overrides.
+* Created the **Bug Fixing Module** supporting debugging challenges, progressive attempt-based hints, and diff-based correction checks.
+* Updated `db_init.js` and all seed files to initialize and populate MongoDB indexes and collections for all new modules.
+* Preserved 100% backward compatibility with existing code files by utilizing safe delegating wrappers under `modules/` and redirecting old utility files.
+* Integration tests updated to include 9 test suites covering all modules (Auth, Coding, MCQ, Assignment, Bugfix) with 100% success (all green checks).
 
 ### 2. Execution Health & Integration Tests:
-* All 7 containers are fully active, running, and healthy.
-* Integration test suite (`npm run test` inside `backend-api`) passes 100% with **6/6 green checks**:
-  * `GET /health` (status: ok)
-  * `POST /login` credentials verification
-  * `GET /questions` and question CRUD queries
-  * TestCase CRUD queries
-  * `POST /run` code sandbox validation
-  * Submissions and Leaderboard database flow
-* Background submission queue worker loops on Redis and successfully evaluates python scripts in the Judge0 sandbox, updating MongoDB state correctly.
-
-### 3. Async Submission Polling Architecture (Implemented July 6, 2026):
-* **Problem Solved**: Browser HTTP timeout (50s) when Judge0 takes longer to execute code.
-* **Backend Changes**:
-  * `submission_service.js`: `enqueueSubmission()` always returns immediately. Redis fallback spawns fire-and-forget async task instead of blocking.
-  * `submissions.js`: Added `GET /submissions/:id/status` lightweight endpoint (returns only status, passed, total — no code/stdout).
-* **Frontend Changes**:
-  * `script.js`: `pollSubmission()` uses `/submissions/:id/status` every 2s, shows elapsed time, has 120s timeout guard, and transient network errors don't kill the polling loop.
-* **Flow**: POST /submit → DB record "In Queue" → Redis push → instant response → Worker processes → Frontend polls status → Final verdict displayed.
+* All docker compose containers are active, healthy, and operational.
+* Background queue worker properly evaluates scripts in the Judge0 sandbox.

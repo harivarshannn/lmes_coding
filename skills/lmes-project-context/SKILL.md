@@ -4,9 +4,9 @@ description: "Holds the absolute project context, database structure, container 
 category: project
 risk: safe
 source: local
-date_added: "2026-07-06"
+date_added: "2026-07-07"
 metadata:
-  last_updated: "2026-07-06T07:53:31.164Z"
+  last_updated: "2026-07-07T05:17:10.109Z"
   status: "active"
 ---
 
@@ -23,6 +23,17 @@ This skill serves as the single source of truth for the codebase context. It is 
   * Worker (`lmes_portal-worker-1`) executing submissions
 * **Legacy Queue Database (`postgres`)**: PostgreSQL 16 on `5435` mapping to `5432` for Judge0 queue storage.
 
+## 📦 Domain-Driven Modular Monolith
+The codebase is refactored from a flat structure into modular folder groups under `app/modules/`:
+* **auth/**: Mock login and token authentication logic.
+* **users/**: User profiles, registration, and streaks lookup.
+* **coding/**: Consolidates coding questions, sandboxed runs, testcases, and submissions.
+* **mcq/**: MCQ quizzes, question management, shuffling options, and auto-grading.
+* **assignment/**: Assignments with deadlines, file/inline code submission, and auto + manual grading.
+* **bugfix/**: Intentionally buggy challenges, progressive hints, and Judge0-based fix validation.
+* **gamification/**: Streaks, leaderboard XP, and achievements/badge awarding.
+* **topics/**: Management of catalog topic tags.
+
 ## 🚀 MongoDB Schema Patterns
 * **Sequential Integer IDs**: Primary keys use sequential integers (stored in both `_id` and `id`). Never use Hex ObjectIds. Lookups use helper `getNextSequenceValue(...)`.
 * **Unique Indices**:
@@ -30,6 +41,10 @@ This skill serves as the single source of truth for the codebase context. It is 
   * Questions: slug
   * Achievements: compound user_id + badge_id
   * Progress: compound user_id + question_id
+  * MCQ Quizzes: slug
+  * Assignments: slug
+  * Bugfix Challenges: slug
+  * Assignment Submissions: compound assignment_id + user_id
 
 ## 🎨 UI & Styles
 * **Branding Theme**: Redressed with Wrench Wise visual system (Emerald green `#00B67A` and Cyan `#00d294` accents, light glassmorphism card panels with backdrop blur, light Monaco IDE theme).

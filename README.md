@@ -1,125 +1,94 @@
-# DevArena AI-Powered Coding Practice Platform
+# 🚀 LMES DevArena: Multi-Module Assessment Practice Platform
 
-DevArena is a highly optimized, production-ready coding practice and evaluation platform. It utilizes a **Node.js (Express)** backend API, **MongoDB** database, **Redis** enqueuing system, a customized lightweight **Judge0 CE** execution sandbox, and a separate microservice-based **AI Service** for code reviews and progressive suggestions.
+Welcome to the backend API and sandbox execution environment for **LMES DevArena**, redressed in the high-fidelity, light-glassmorphic **Wrench Wise** visual system. 
 
-Designed to run efficiently on small virtual private servers (2 vCPUs, 4 GB RAM), the stack has been optimized from over 15 GB down to less than 1.2 GB by stripping out unused compiler runtimes and shifting static web evaluations (HTML/CSS) to client-side sandboxed frames.
+The codebase has been evolved from a single-purpose Judge0 coding executor into an organized **Domain-Driven Modular Monolith** supporting multiple assessment types (Coding, MCQs, Projects/Assignments, and Bug-fixing challenges).
 
 ---
 
-## Unified Project Architecture
+## 🛠️ Technology Stack & System Architecture
 
-```mermaid
-graph TD
-    Client[Next.js Client / Monaco Web IDE] -->|HTTP API /run, /submit, /login| Express[Express Backend Server]
-    
-    %% Caching and Enqueuing
-    Express -->|Cache-aside / Rate limits| Redis[(Redis Caching & Queue)]
-    RedisQueue[Redis Worker Queue] -->|Pulls submissions| WorkerDaemon[Asynchronous Grading Worker]
-    
-    %% Data Persistence
-    Express -->|MongoDB Driver| MongoDB[(MongoDB Database)]
-    WorkerDaemon -->|Saves results / awards XP & Streaks| MongoDB
-    
-    %% Sandbox & AI
-    WorkerDaemon -->|Runs Python / JS code| Judge0[Judge0 Sandboxed Exec Server]
-    Express -->|Generates reviews / hint suggestions| AIService[AI Microservice]
-    
-    %% Web Sandbox
-    Client -->|Renders & validates HTML/CSS DOM| WebSandbox[Sandboxed Iframe Sandbox]
+The platform integrates modern, decoupled technologies:
+* **Backend Framework:** Node.js (Express) with a modular domain-driven router structure.
+* **Database Caching & Task Queues:** Redis (using `ioredis`) for storing the asynchronous submissions queue and caching queries.
+* **Database Engine:** MongoDB (using the official Node.js Driver) for all student progress, submissions, questions, daily streaks, achievements, and leaderboard statistics.
+* **Isolation Sandbox:** Judge0 CE (running inside isolated cgroups v2-patched Docker environments) to compile and execute student Python, JavaScript, and SQL submissions safely.
+* **AI Feedback Microservice:** FastAPI Python server providing real-time reviews of code submissions (utilizing fallback outputs if disconnected).
+
+---
+
+## 📂 Modular Monolith Domain Layout
+
+The application logic has been refactored under `backend/app/` into isolated domain modules:
+
+```
+app/
+├── common/                  # Shared infrastructure
+│   ├── middleware/          # Auth verification and role route guards
+│   ├── utils/               # Exceptions, rate limits, validators, response helpers
+│   └── constants.js         # Shared enums (Statuses, Difficulties, Roles)
+│
+├── modules/                 # Modular domain domains
+│   ├── auth/                # Login authentication logic
+│   ├── users/               # Student profile and streak management
+│   ├── topics/              # Catalog topic tags
+│   ├── coding/              # Coding question execution and evaluation
+│   ├── mcq/                 # MCQ quizzes, timing rules, option shuffling
+│   ├── assignment/          # Multi-file assignments, deadlines, auto + manual grading
+│   └── bugfix/              # Bugfixing challenges with progressive hint loops
 ```
 
-### Services Overview
-1. **`backend-api` (Express):** Orchestrates API routes, manages DB transactions, handles cache-aside mechanisms, exposes rate limiters, and runs the background worker thread.
-2. **`ai-service` (FastAPI):** Specialized microservice that generates code quality reviews and progressive hints.
-3. **`mongodb` (MongoDB 6):** Holds application data for questions, starter templates, tags, test cases, solutions, attempts, daily streaks, leaderboards, progress, and badges.
-4. **`db` (Postgres 16):** Used purely as an internal runtime queue/store for the Judge0 sandbox (no application/business data).
-5. **`redis` (Redis 7):** Serves as the global cache, API rate limiter, and FIFO queue broker.
-6. **`server` / `worker` (Judge0 CE):** Executes user submissions under highly secure, cgroups v2-isolated runtimes (`isolate` sandbox v2.0).
+---
+
+## 🎯 Assessment Module Capabilities
+
+### 1. 💻 Coding Challenges (`coding/`)
+* Sandboxed execution of student code (Python, JS, SQL) against testcases in isolated cgroups.
+* Real-time XP awarding, streaker updates, and leaderboard rankings logic.
+
+### 2. 📝 MCQ Quizzes (`mcq/`)
+* Time-limited quizzes with randomized question option ordering to prevent cheating.
+* Auto-grading evaluation engine returning detailed correctness reports and explanations.
+
+### 3. 📂 Practical Assignments (`assignment/`)
+* Project assignments with template starter codes and strict deadlines.
+* Hybrid grading pipeline supporting both Judge0-based auto-grading and instructor manual overrides with feedback.
+
+### 4. 🐛 Bug Fixing Challenges (`bugfix/`)
+* Debugging challenges presenting intentionally buggy code.
+* Progressive attempt-based hints revealed incrementally to guide students to the solution.
 
 ---
 
-## Features & Optimizations
+## 🚀 Local Quickstart Guide
 
-### 1. Stripped Compiler Runtimes
-To run on cost-effective VPS nodes, the Judge0 compiler base image was refactored in [Dockerfile.compilers](file:///K:/lmes_portal/judge0/Dockerfile.compilers) to completely remove Java, Rust, Go, C++, PHP, Kotlin, Ruby, and 50+ other heavy runtimes. Only **Python 3** and **Node.js** execution pathways are preserved.
+### Prerequisite: Docker Environment
+Verify that Docker Desktop / WSL2 is running.
 
-### 2. Client-Side Web Sandbox (Task 7)
-Web questions (HTML/CSS) bypass Judge0 servers entirely to save resources. They render inside a secure `iframe` with `sandbox="allow-scripts"` and undergo automated DOM and Tailwind CSS class check validation:
-* **Required Elements:** Verifies existence of required components (e.g. `button#submit-btn`).
-* **Required CSS Styling:** Validates layout configurations (e.g. `bg-blue-600`, `text-white`, `px-4`, `py-2`, `rounded`).
-* **JavaScript Functionality:** Simulates click actions or script execution.
-
-### 3. Redis Queue & Caching (Task 3)
-* **Asynchronous Submissions:** When a user submits code, it is enqueued into Redis and processed out-of-band by a background daemon. Users poll the endpoint for instant updates.
-* **Cache-aside Layer:** Public questions, test cases, and leaderboard rosters are cached in Redis. Writes instantly invalidate caches to prevent stale reads.
-* **API Rate Limiting:** Prevent brute-forcing of `/run`, `/submit`, and `/login` using sliding-window rate limits.
-
-### 4. Progressive AI Learning System (Task 8)
-* **Attempt-based Hints:** Suggests progressive hints (Stage 1: Small hint, Stage 2: Detailed hint, Stage 3: Approach) before unlocking the verified solutions and O-notation complexity information on attempt 4.
-* **AI Code Reviews:** Triggers service-to-service calls to `ai-service` to review code efficiency, identify bugs, and recommend refactoring.
-
----
-
-## Getting Started (Local Run)
-
-### 1. Start the Unified Compose Stack
-Spin up the entire decoupled microservices stack (the custom multi-stage compilation for the Judge0 worker is built automatically on the first boot):
+### 1. Build and Start the Stack
+Spin up the MongoDB, Redis, Postgres, Judge0 CE sandbox, and API containers:
 ```bash
-docker compose up --build -d
+docker compose up -d --build
 ```
 
-### 2. Seed Database Structures
-Seed the PostgreSQL schemas with initial database structures (Languages, Databases/DS Topics, SQL/Python Questions, Test cases, Hints, and Solutions):
+### 2. Seed the Database
+Initialize collections, indexes, and seed mock assessment data for all modules:
 ```bash
 docker compose exec backend-api node app/seed/seed_data.js
 ```
 
-### 3. (Optional) Local Development Setup
-To run scripts, debuggers, or execute unit tests locally outside Docker, set up Node.js:
-```bash
-# Navigate to the backend folder
-cd backend
-
-# Install dependencies
-npm install
-```
-
-### 4. Open the Web IDE
-Access the Monaco Editor-based single-page workspace:
-* **URL:** [http://localhost:8008/](http://localhost:8008/)
-
----
-
-## API References
-
-### Authentication (Rate Limited)
-* `POST /login` - Student/Admin login authentication.
-
-### Questions & Problems
-* `GET /questions` - Retrieve cached list of all questions.
-* `POST /questions` - (Admin) Create a question.
-* `DELETE /questions/{id}` - (Admin) Delete a question.
-* `POST /questions/{id}/duplicate` - (Admin) Duplicate an existing question.
-
-### Test Cases
-* `GET /questions/{id}/testcases` - Retrieve test cases for a question.
-* `POST /questions/{id}/testcases` - (Admin) Create a test case.
-
-### Execution & Submissions
-* `POST /run` - Run code against custom stdin input.
-* `POST /submit` - Enqueue submission for full evaluation.
-* `GET /submissions/{id}` - Poll submission grading state.
-
-### Gamification & Learning
-* `GET /leaderboard` - Fetch top developers ranked by XP (cached).
-* `GET /questions/{id}/stage` - Fetch next progressive AI hint stage.
-* `POST /attempts/{attempt_id}/feedback` - Get AI Code review feedback.
-
----
-
-## Running Automated Tests
-
-To execute the unit test suite inside the Express container:
+### 3. Run Integration Tests
+Verify all 9 integration test suites (verifying Auth, Coding, MCQ, Assignment, Bugfix, and Leaderboard flows):
 ```bash
 docker compose exec backend-api npm run test
 ```
+*(All 9 subtests are expected to return green `ok` status)*.
+
+---
+
+## 🎨 Visual System: Wrench Wise Accents
+
+The static mirror served at `/static/pencil_mirror.html` adopts the high-end engineering visual theme:
+* **Emerald Green (`#00B67A`)** success states, badge highlights, and button CTA hover transitions.
+* **Cyan Accent (`#00d294`)** for interactive elements, streaks counters, and highlight overlays.
+* **Light Backdrop Blur** panels with glassmorphic cards and a light Monaco IDE theme workspace.

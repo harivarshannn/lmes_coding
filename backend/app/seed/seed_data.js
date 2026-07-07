@@ -304,6 +304,15 @@ rl.on('line', (line) => {
   const todayStr = new Date().toISOString().split('T')[0];
   await dailyStreaks.insertOne({ _id: await db.getNextSequenceValue('streak_id'), user_id: 1, current_streak: 1, longest_streak: 1, last_activity_date: todayStr });
 
+  // Seed additional modules
+  const seedMcq = require('./seed_mcq');
+  const seedAssignments = require('./seed_assignments');
+  const seedBugfix = require('./seed_bugfix');
+
+  await seedMcq();
+  await seedAssignments();
+  await seedBugfix();
+
   console.log("Database seeded successfully!");
 }
 

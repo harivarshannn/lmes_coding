@@ -1,17 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { CodingPlatformException } = require('./utils/exceptions');
+const { CodingPlatformException } = require('./common/utils/exceptions');
 const { startBackgroundWorker } = require('./services/submission_service');
 
 const healthRouter = require('./routes/health');
-const authRouter = require('./routes/auth');
-const questionsRouter = require('./routes/questions');
-const testcasesRouter = require('./routes/testcases');
-const runRouter = require('./routes/run');
-const submissionsRouter = require('./routes/submissions');
-const learningRouter = require('./routes/learning');
-const leaderboardRouter = require('./routes/leaderboard');
+const authRouter = require('./modules/auth/auth.routes');
+const codingRouter = require('./modules/coding/coding.routes');
+const mcqRouter = require('./modules/mcq/mcq.routes');
+const assignmentRouter = require('./modules/assignment/assignment.routes');
+const bugfixRouter = require('./modules/bugfix/bugfix.routes');
+const gamificationRouter = require('./modules/gamification/gamification.routes');
+const topicsRouter = require('./modules/topics/topics.routes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -22,12 +22,12 @@ app.use(express.json());
 // Register routers
 app.use(healthRouter);
 app.use(authRouter);
-app.use(questionsRouter);
-app.use(testcasesRouter);
-app.use(runRouter);
-app.use(submissionsRouter);
-app.use(learningRouter);
-app.use(leaderboardRouter);
+app.use(codingRouter);
+app.use(mcqRouter);
+app.use(assignmentRouter);
+app.use(bugfixRouter);
+app.use(gamificationRouter);
+app.use(topicsRouter);
 
 // Serve premium frontend static files
 app.use('/static', express.static(path.join(__dirname, '../static')));

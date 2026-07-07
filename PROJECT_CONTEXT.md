@@ -5,52 +5,53 @@ This file serves as a memory checkpoint for AI coding agents (like Antigravity o
 ---
 
 ## 1. Project Mission
-Build a production-grade Coding Assessment Execution Service (LeetCode clone) for Python, C++, and Java.
-- **Backend:** FastAPI, PostgreSQL, SQLAlchemy ORM, Alembic.
-- **Sandbox Engine:** Local Judge0 CE (Docker-based) using the Linux `isolate` sandbox.
+Build a production-grade multi-assessment platform supporting:
+1. **Coding Challenges**: Sandboxed code execution (Python, JS, SQL) against test cases.
+2. **MCQ Quizzes**: Randomized question and option sorting with auto-grading.
+3. **Assignments**: Practical template-driven coding projects with auto-grading & manual grading.
+4. **Bug Fixing Challenges**: Debugging practices with progressive attempt-based hints.
 
 ---
 
-## 2. Workspace Layout
-- `K:/lmes_portal/backend`: The FastAPI web server and database configuration.
-- `K:/lmes_portal/judge0`: The Judge0 CE configuration, database, Redis broker, server, and worker containers.
+## 2. Architecture & Modular Layout
+The system is built as a **Domain-Driven Modular Monolith** in Express:
+- **Shared Infrastructure**: Located in `backend/app/common/`. Provides authorization/role middlewares, exception classes, and standard response helpers.
+- **Modules**: Located in `backend/app/modules/`.
+  - `auth/` (mock credentials login/authentication)
+  - `users/` (streaks, badge awards, progress)
+  - `coding/` (question CRUD, code submissions)
+  - `mcq/` (MCQ quizzes and attempts)
+  - `assignment/` (project tasks and auto/manual grading)
+  - `bugfix/` (buggy challenges and fix attempts)
+  - `gamification/` (leaderboard rankings and streaker status)
+  - `topics/` (system categorization topics)
 
 ---
 
-## 3. The WSL2 Cgroup v2 Virtualization Patch
-On Windows 11 with WSL2/Docker Desktop, the system boots into pure **cgroups v2**. However, Judge0's standard `isolate` sandbox (v1.8.1) requires cgroups v1. Without cgroups, it restricts process limits to 1 (`RLIMIT_NPROC=1`), causing C++ compilations (`g++` forks) and Java runtime executions (JVM thread spawns) to fail with resource limits errors.
-
-### The Virtualization Solution (Apply if containers are rebuilt):
-1. **Docker Worker User:** In `K:/lmes_portal/judge0/docker-compose.yml`, the `worker` service is configured with `user: root` and `privileged: true`.
-2. **Cgroup Controller Setup on Startup:** The `worker` container runs a startup command wrapper:
-   ```yaml
-   command: ["bash", "-c", "mkdir -p /sys/fs/cgroup/init && for pid in $$(cat /sys/fs/cgroup/cgroup.procs); do echo $$pid > /sys/fs/cgroup/init/cgroup.procs 2>/dev/null; done; echo '+cpu +memory +pids +cpuset' > /sys/fs/cgroup/cgroup.subtree_control; exec ./scripts/workers"]
-   ```
-   *Explanation:* This complies with cgroup v2's "no internal processes" constraint by moving container processes to `/sys/fs/cgroup/init` before distributing CPU, memory, and PIDs controllers to child sandboxes.
-3. **Sandbox Upgrade:** Run `/tmp/install_isolate.sh` (or [install_isolate.sh](file:///K:/lmes_portal/judge0/install_isolate.sh) copied from the host) inside `judge0-worker-1` as root. This compiles **isolate v2.0** (which supports cgroup v2) and writes `/usr/local/etc/isolate` with `cg_root = /sys/fs/cgroup`.
-4. **Rails ActiveJob Configuration:** In [isolate_job.rb](file:///K:/lmes_portal/judge0/app/jobs/isolate_job.rb), cgroups are enabled using `@cgroups = "--cg"`. Deprecated `--cg-timing` flags are removed, and the `exec` prefix is removed from the execution script since multiprocessing works natively under cgroups.
+## 3. Sandboxing & Virtualization
+Windows 11 host runs WSL2 and Docker Desktop.
+- **Judge0 CE**: Runs isolated sandboxed executions inside Docker.
+- **Redis Queue**: Buffer for submissions processing via a background worker (`startBackgroundWorker`).
+- **Mock Service Fallback**: During unit testing (`npm run test`), `JUDGE0_URL` is empty, causing the evaluator to run against `MockJudge0Service` for fast local testing.
 
 ---
 
 ## 4. Verification Commands
 
-### Integration Test (Real Sandbox)
-To submit and execute Python, C++, and Java code against the active Judge0 worker sandbox:
-```powershell
-docker exec -e JUDGE0_URL=http://host.docker.internal:2358 backend-web-1 python app/tests/test_judge0_integration.py
-```
-*Expected Output:* All three languages must print `validation PASSED!` with `Accepted` status.
+### Seeding Collections
+To drop, recreate collections, and seed mock assessment data:
+* Local: `$env:DATABASE_URL="mongodb://127.0.0.1:27017/coding_platform"; npm run seed`
+* Inside Docker: `docker compose exec backend-api node app/seed/seed_data.js`
 
-### Unit Tests
-To run all web server, schema, database, and evaluation tests:
-```powershell
-docker exec -e PYTHONPATH=/workspace backend-web-1 pytest
-```
-*Expected Output:* `15 passed`
+### Running Integration Tests
+To execute all 9 test suites covering authentication, coding CRUD, testcase CRUD, run executions, submissions, MCQ quizzes, assignments, and bugfixing challenges:
+* Local: `$env:DATABASE_URL="mongodb://127.0.0.1:27017/coding_platform"; npm run test`
+* Inside Docker: `docker compose exec backend-api npm run test`
 
 ---
 
 ## 5. Active Container Info
-- **FastAPI Port:** `8000` (`backend-web-1`)
-- **Postgres DB Port:** `5432` (`backend-db-1`)
-- **Judge0 Port:** `2358` (`judge0-server-1`)
+- **Express Backend API Port:** `8008` (external) -> `8000` (internal)
+- **MongoDB Port:** `27017`
+- **Redis Port:** `6379`
+- **Judge0 CE Port:** `2358`
